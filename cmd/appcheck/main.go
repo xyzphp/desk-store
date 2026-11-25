@@ -4,7 +4,7 @@
 //	appcheck pack <应用目录> [-o 文件]  确定性打包为 ZIP
 //	appcheck summary <应用目录> [-base 已发布数据]  输出评审用的权限摘要（Markdown）
 //	appcheck build [-out dist/public] [-previous 地址] [-download-base 地址]
-//	appcheck sign [-out dist/public] [-require-configured]   私钥取自 DESK_STORE_SIGNING_KEY
+//	appcheck sign [-out dist/public] [-require-configured] [-dev-key 文件]   私钥取自 DESK_STORE_SIGNING_KEY
 //	appcheck verify [-out dist/public]
 //	appcheck keygen
 package main
@@ -70,7 +70,7 @@ func usage() {
   pack <应用目录> [-o 文件]               确定性打包为 ZIP
   summary <应用目录> [-base 已发布数据]   输出评审用的权限摘要
   build [-out dist/public] [-previous 地址] [-download-base 地址]
-  sign [-out dist/public] [-require-configured]   私钥取自 `+signingKeyEnv+`
+  sign [-out dist/public] [-require-configured] [-dev-key 文件]   私钥取自 `+signingKeyEnv+`
   verify [-out dist/public]               校验输出中的签名与哈希
   keygen                                  生成签名密钥对`)
 }
@@ -274,10 +274,20 @@ func sign(args []string) error {
 	flags := flag.NewFlagSet("sign", flag.ExitOnError)
 	out := flags.String("out", "dist/public", "输出目录")
 	require := flags.Bool("require-configured", false, "要求签名公钥已写入 store.config.json")
+	devKey := flags.String("dev-key", "", "本地联调用的密钥文件：不存在时生成；只在未设置 "+signingKeyEnv+" 时使用，不能与 -require-configured 同用")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	key := os.Getenv(signingKeyEnv)
+	if key == "" && *devKey != "" {
+		if *require {
+			return errors.New("-dev-key 只用于本地联调，发布时必须使用 " + signingKeyEnv)
+		}
+		var err error
+		if key, err = loadDevKey(*devKey); err != nil {
+			return err
+		}
+	}
 	if key == "" {
 		return errors.New("缺少环境变量 " + signingKeyEnv)
 	}
@@ -287,6 +297,29 @@ func sign(args []string) error {
 	}
 	fmt.Printf("已签名 %d 个版本\n", count)
 	return build.VerifyOutput(*out)
+}
+
+// loadDevKey 读取本地联调密钥；文件不存在时生成并以 0600 权限保存，之后的签名沿用同一把密钥，
+// 系统中登记的公钥指纹因此保持不变。
+func loadDevKey(file string) (string, error) {
+	if data, err := os.ReadFile(file); err == nil {
+		return strings.TrimSpace(string(data)), nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", err
+	}
+	encoded := base64.StdEncoding.EncodeToString(private.Seed())
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(file, []byte(encoded+"\n"), 0o600); err != nil {
+		return "", err
+	}
+	fmt.Printf("已生成本地联调密钥 %s（只用于本机，不要提交或用于发布）\n", file)
+	return encoded, nil
 }
 
 func verify(args []string) error {

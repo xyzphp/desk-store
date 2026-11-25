@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.0.9",
   "scripts": {
-    "data": "cd .. && go run ./cmd/appcheck build -out dist/public",
+    "data": "cd .. && go run ./cmd/appcheck build -out dist/public && go run ./cmd/appcheck sign -out dist/public -dev-key dist/dev-signing.key",
     "dev": "vite",
     "start": "pnpm data && vite",
     "build": "tsc -p tsconfig.json && vite build",

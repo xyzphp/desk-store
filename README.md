@@ -48,7 +48,7 @@ go run ./cmd/appcheck pack apps/my-app    # 打包后在自己的系统中手动
 ```sh
 cd web
 pnpm install
-pnpm start   # 生成 ../dist/public 下的商店数据并启动网站：http://localhost:5180
+pnpm start   # 生成并用本地联调密钥签名商店数据，再启动网站：http://localhost:5180
 # 只改网站代码时可以直接 pnpm dev；改了 apps/ 后重新运行 pnpm data
 ```
 

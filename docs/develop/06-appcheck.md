@@ -12,7 +12,7 @@ go run ./cmd/appcheck <命令>
 | `pack <应用目录> [-o 文件]` | 确定性打包为 ZIP |
 | `summary <应用目录> [-base 地址]` | 输出权限摘要；带 `-base`（已发布数据的 `api/v1` 地址或目录）时列出与已发布版本相比的权限变化 |
 | `build [-out dist/public]` | 生成商店静态数据 |
-| `sign` / `verify` / `keygen` | 签名相关，见[自建商店](../self-host/01-fork.md) |
+| `sign` / `verify` / `keygen` | 签名相关，见[自建商店](../self-host/01-fork.md)；`sign -dev-key 文件` 用本地联调密钥签名（文件不存在时生成），不能用于发布 |
 
 ## 确定性打包
 
@@ -36,6 +36,9 @@ shasum -a 256 world-clock.zip
 ```sh
 cd web
 pnpm install
-pnpm start  # 生成 ../dist/public 下的商店数据并启动网站：http://localhost:5180
+pnpm start  # 生成并签名 ../dist/public 下的商店数据，再启动网站：http://localhost:5180
 # 只改网站代码时可以直接 pnpm dev；改了 apps/ 后重新运行 pnpm data
 ```
+
+`pnpm data` 用本地联调密钥 `dist/dev-signing.key` 签名（首次运行时生成）。在本机系统中把 `http://127.0.0.1:5180/` 添加为商店源并核对指纹后，就能从本地商店安装应用；`dist/` 不进入 git，这把密钥也不能用于发布。
+
