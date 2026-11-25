@@ -1,0 +1,58 @@
+name: Check
+
+# Pull Request 校验：Go 代码、全部应用、版本规则与网站构建。不使用任何密钥，
+# fork 提交的 PR 同样安全运行。
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Go format, vet and tests
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "请运行 gofmt"; exit 1; }
+          go vet ./...
+          go test ./...
+      - name: Validate apps
+        run: go run ./cmd/appcheck check
+      - name: Version rules against the published store
+        # 与线上已发布数据对比：改了安装包必须提升版本，已发布的版本号不能复用。
+        run: go run ./cmd/appcheck build -out dist/public -previous "$(jq -r .homepage store.config.json)api/v1"
+      - name: Permission summary of changed apps
+        if: github.event_name == 'pull_request'
+        run: |
+          base="$(jq -r .homepage store.config.json)api/v1"
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- apps/ | cut -d/ -f2 | sort -u)
+          echo "## 权限摘要" >> "$GITHUB_STEP_SUMMARY"
+          for slug in $changed; do
+            if [ -d "apps/$slug" ]; then
+              go run ./cmd/appcheck summary "apps/$slug" -base "$base" >> "$GITHUB_STEP_SUMMARY"
+              echo >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- 删除了 \`$slug\`（发布后会显示为已下架）" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Build the website
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build

@@ -1,0 +1,6 @@
+# 商店维护者审核全部改动；每个应用目录可以追加自己的维护者，更新应用时需要其批准。
+* @xyzphp
+
+/apps/hello-world/ @xyzphp
+/apps/world-clock/ @xyzphp
+/apps/service-status/ @xyzphp

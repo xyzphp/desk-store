@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "slug": "world-clock",
+  "name": "世界时钟",
+  "version": "1.0.0",
+  "description": "同时显示多个时区的当前时间，城市列表保存在页面内存中。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "window": { "width": 640, "height": 460 }
+}

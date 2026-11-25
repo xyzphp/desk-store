@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>你好世界</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    main { text-align: center; }
+    h1 { margin: 0 0 8px; font-size: 24px; }
+    p { margin: 0; font-size: 14px; opacity: .72; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>你好，世界</h1>
+    <p id="time"></p>
+  </main>
+  <script>
+    document.getElementById('time').textContent = '当前时间：' + new Date().toLocaleString();
+  </script>
+</body>
+</html>

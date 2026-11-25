@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "slug": "hello-world",
+  "name": "你好世界",
+  "version": "1.0.0",
+  "description": "最小的示例应用：一个包内静态页面，不调用任何接口。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "window": { "width": 560, "height": 420 }
+}

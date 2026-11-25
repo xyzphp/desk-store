@@ -1,0 +1,129 @@
+name: Publish
+
+# 推送到 main 后发布：
+#   build  无密钥：校验、生成静态数据、确定性打包新版本、构建网站；
+#   sign   在受保护的 store-publish 环境中只对版本记录签名，为新版本创建 Release；
+#   deploy 部署到 GitHub Pages。
+# 签名作业不执行 npm 等第三方代码，也不执行应用内容。未配置签名密钥时跳过发布。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Validate apps
+        run: go run ./cmd/appcheck check
+      - name: Generate store data
+        run: |
+          go run ./cmd/appcheck build -out dist/public \
+            -previous "$(jq -r .homepage store.config.json)api/v1" \
+            -download-base "https://github.com/${{ github.repository }}/releases/download"
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Build the website
+        working-directory: web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: store-dist
+          path: dist
+          include-hidden-files: false
+          retention-days: 7
+
+  sign:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: store-publish
+    permissions:
+      contents: write
+    outputs:
+      ready: ${{ steps.key.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the signing key
+        id: key
+        env:
+          DESK_STORE_SIGNING_KEY: ${{ secrets.DESK_STORE_SIGNING_KEY }}
+        run: |
+          if [ -z "$DESK_STORE_SIGNING_KEY" ]; then
+            echo "::warning::store-publish 环境未配置 DESK_STORE_SIGNING_KEY，跳过发布。配置方法见 docs/self-host/01-fork.md"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.key.outputs.ready == 'true'
+        with:
+          name: store-dist
+          path: dist
+      - uses: actions/setup-go@v5
+        if: steps.key.outputs.ready == 'true'
+        with:
+          go-version-file: go.mod
+      - name: Sign version records
+        if: steps.key.outputs.ready == 'true'
+        env:
+          DESK_STORE_SIGNING_KEY: ${{ secrets.DESK_STORE_SIGNING_KEY }}
+        run: go run ./cmd/appcheck sign -out dist/public -require-configured
+      - name: Publish signed data into the site
+        if: steps.key.outputs.ready == 'true'
+        run: |
+          rm -rf dist/site/api
+          cp -R dist/public/api dist/site/api
+      - name: Create releases for new versions
+        if: steps.key.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          jq -c '.[]' dist/new-versions.json | while read -r item; do
+            tag=$(echo "$item" | jq -r .tag)
+            file=$(echo "$item" | jq -r .file)
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag 已存在，跳过"
+              continue
+            fi
+            gh release create "$tag" "dist/$file" --target "${{ github.sha }}" --title "$tag" \
+              --notes "由 Publish 工作流从 ${{ github.sha }} 确定性打包并签名。"
+          done
+      - uses: actions/configure-pages@v5
+        if: steps.key.outputs.ready == 'true'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.key.outputs.ready == 'true'
+        with:
+          path: dist/site
+
+  deploy:
+    needs: sign
+    if: needs.sign.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

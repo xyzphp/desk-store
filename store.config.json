@@ -1,0 +1,9 @@
+{
+  "id": "desk-store",
+  "name": "Desk Store",
+  "description": "面向浏览器桌面的开源应用商店：应用以源码提交，由 CI 校验、打包并签名。",
+  "homepage": "https://xyzphp.github.io/desk-store/",
+  "repository": "https://github.com/xyzphp/desk-store",
+  "access": "public",
+  "keys": []
+}

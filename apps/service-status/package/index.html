@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>服务状态</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; font-size: 14px; }
+    body { margin: 0; padding: 20px; }
+    h1 { margin: 0 0 12px; font-size: 18px; }
+    button { font: inherit; padding: 4px 12px; }
+    pre { overflow: auto; padding: 12px; border-radius: 8px; background: color-mix(in srgb, currentColor 8%, transparent); }
+    .error { color: #c62828; }
+  </style>
+</head>
+<body>
+  <h1>服务状态</h1>
+  <button id="refresh" type="button">刷新</button>
+  <p id="message" role="status"></p>
+  <pre id="output" hidden></pre>
+  <script>
+    (function () {
+      'use strict';
+      var pending = {};
+      var origin = new URL(document.baseURI).origin;
+      window.addEventListener('message', function (event) {
+        var data = event.data || {};
+        if (event.source !== window.parent || data.type !== 'xyzos:proxy:response' || !pending[data.id]) return;
+        var done = pending[data.id];
+        delete pending[data.id];
+        done(data);
+      });
+      function proxy(path) {
+        return new Promise(function (resolve) {
+          var id = 'status-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+          pending[id] = resolve;
+          window.parent.postMessage({ type: 'xyzos:proxy', id: id, proxy: 'status', path: path, method: 'GET' }, origin);
+        });
+      }
+      var message = document.getElementById('message');
+      var output = document.getElementById('output');
+      function load() {
+        message.textContent = '正在读取…';
+        message.className = '';
+        proxy('/status.json').then(function (result) {
+          if (result.error || result.status !== 200) {
+            message.textContent = '读取失败：' + (result.error || 'HTTP ' + result.status) + '。请在应用管理中检查服务地址与令牌。';
+            message.className = 'error';
+            output.hidden = true;
+            return;
+          }
+          message.textContent = '读取成功';
+          output.hidden = false;
+          try {
+            output.textContent = JSON.stringify(JSON.parse(result.body), null, 2);
+          } catch (error) {
+            output.textContent = result.body;
+          }
+        });
+      }
+      document.getElementById('refresh').addEventListener('click', load);
+      load();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "summary": "读取服务状态接口，在桌面卡片中显示资源使用率",
+  "category": "monitoring",
+  "tags": ["监控", "桌面卡片", "示例"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/desk-store"
+}

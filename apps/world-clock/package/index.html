@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>世界时钟</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>世界时钟</h1>
+      <form id="add">
+        <label for="zone">添加时区</label>
+        <select id="zone"></select>
+        <button type="submit">添加</button>
+      </form>
+    </header>
+    <ul id="clocks" aria-live="polite"></ul>
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>

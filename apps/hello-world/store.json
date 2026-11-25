@@ -1,0 +1,8 @@
+{
+  "summary": "最小的示例应用，演示包结构与提交流程",
+  "category": "developer",
+  "tags": ["示例"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/desk-store"
+}

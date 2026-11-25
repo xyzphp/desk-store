@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "slug": "service-status",
+  "name": "服务状态",
+  "version": "1.0.0",
+  "description": "通过受控代理读取服务的状态接口，并在桌面卡片中显示资源使用率。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "desktop_widget": true,
+  "widget": {
+    "title": "服务状态",
+    "proxy": "status",
+    "path": "/status.json",
+    "refresh_seconds": 300,
+    "metrics": [
+      { "label": "CPU 使用率", "value_path": "cpu.used_percent" },
+      { "label": "磁盘使用率", "value_path": "disk.used_percent" }
+    ]
+  },
+  "permissions": ["proxy.status"],
+  "proxies": [
+    {
+      "key": "status",
+      "title": "状态接口",
+      "upstream": "https://status.example.com",
+      "base_url_editable": true,
+      "auth_type": "bearer",
+      "paths": ["/status.json"],
+      "methods": ["GET"]
+    }
+  ]
+}
