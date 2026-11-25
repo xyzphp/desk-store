@@ -486,6 +486,21 @@ body {
   line-height: 1.7;
 }
 
+.store-markdown .markdown-table {
+  overflow-x: auto;
+}
+
+.store-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+/* 参考表的首列是字段名或命令，保持在一行内，其余列自然换行。 */
+.store-markdown td:first-child,
+.store-markdown th:first-child {
+  white-space: nowrap;
+}
+
 .store-markdown--compact {
   margin-top: 6px;
   font-size: 13px;

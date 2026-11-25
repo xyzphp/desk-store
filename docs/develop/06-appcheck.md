@@ -36,6 +36,6 @@ shasum -a 256 world-clock.zip
 ```sh
 cd web
 pnpm install
-pnpm data   # 生成 ../dist/public 下的商店数据
-pnpm dev    # http://localhost:5180
+pnpm start  # 生成 ../dist/public 下的商店数据并启动网站：http://localhost:5180
+# 只改网站代码时可以直接 pnpm dev；改了 apps/ 后重新运行 pnpm data
 ```
