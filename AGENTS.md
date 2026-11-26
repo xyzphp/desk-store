@@ -6,4 +6,5 @@
 - 静态数据格式与签名内容是对外合同：修改 `pkg/appspec/catalog.go` 时同步 `web/src/api.ts` 与 `docs/self-host/02-data-format.md`；不兼容的变化使用新的数据目录。
 - 网站只使用 `@xyzos/desk-ui` 的组件和设计令牌：组件库是 git 子模块 `desk-ui/`，网站按 `workspace:*` 直接使用源码，不经 npm。卡片、详情布局、截图等通用界面先在 desk-ui 中找；缺少通用能力时先在 desk-ui 仓库补建并推送，再更新本仓库的子模块指针，不在网站里另写一套。站点样式只做外框与页面排版，不覆盖组件内部类名。文字不小于 12px，保留键盘操作、焦点与深浅色。
 - 基础自检：`gofmt -l .`、`go vet ./...`、`go test ./...`、`go run ./cmd/appcheck check`、`pnpm install && pnpm typecheck && pnpm build`（仓库根目录，需要已初始化 `desk-ui` 子模块）。如实报告运行过的命令与结果；未在浏览器中检查的界面要说明。
+- `docs/spec/` 是应用包格式 2、后端模块与商店数据格式补充的**接口标准草案**，商店与目标系统两侧都以它为合同：实现时按草案执行，发现需要改动先改草案；某部分两侧都发布后并入 `docs/develop/` / `docs/self-host/` 并从草案中删除。草案不进入网站文档目录。
 - 签名私钥只存在于 `store-publish` 环境；任何脚本、日志与文档都不得输出或要求提供私钥内容。
