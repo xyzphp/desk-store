@@ -34,9 +34,9 @@ shasum -a 256 world-clock.zip
 ## 预览商店网站
 
 ```sh
-cd web
-pnpm install
-pnpm start  # 生成并签名 ../dist/public 下的商店数据，再启动网站：http://localhost:5180
+git submodule update --init   # 网站使用子模块 desk-ui 中的组件库源码
+pnpm install                  # 在仓库根目录执行
+pnpm start  # 生成并签名 dist/public 下的商店数据，再启动网站：http://localhost:5180
 # 只改网站代码时可以直接 pnpm dev；改了 apps/ 后重新运行 pnpm data
 ```
 

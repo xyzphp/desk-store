@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@xyzos/desk-ui/styles.css';
+// site.css 必须先于组件库引入：它在开头声明层顺序 store-base, ds，让组件库样式盖过站点级元素规则。
 import './site.css';
 import { Layout } from './components/Layout';
 import { AppDetailPage } from './pages/AppDetail';

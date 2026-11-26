@@ -1,6 +1,6 @@
-import { Button, CodeBlock, Icon, type IconName } from '@xyzos/desk-ui';
+import { AppCardGrid, Button, CodeBlock, Icon, type IconName } from '@xyzos/desk-ui';
 import { fetchIndex, storeAddress } from '../api';
-import { AppCard } from '../components/AppCard';
+import { StoreAppCard } from '../components/StoreAppCard';
 import { href, navigate } from '../router';
 import { useData } from '../useData';
 
@@ -59,11 +59,11 @@ export function Home() {
         {index.status === 'loading' && <p className="store-muted">正在读取应用列表…</p>}
         {index.status === 'error' && <p className="store-muted">应用列表读取失败：{index.message}</p>}
         {index.status === 'ready' && apps.length === 0 && <p className="store-muted">还没有上架的应用。</p>}
-        <div className="store-grid">
+        <AppCardGrid aria-label="最新应用" className="store-card-list">
           {apps.map((app) => (
-            <AppCard key={app.slug} app={app} />
+            <StoreAppCard key={app.slug} app={app} />
           ))}
-        </div>
+        </AppCardGrid>
       </section>
 
       <section className="store-section store-split">

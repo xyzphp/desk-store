@@ -1,0 +1,17 @@
+{
+  "name": "desk-store",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.0.9",
+  "engines": {
+    "node": "^22.18.0 || >=24.11.0"
+  },
+  "scripts": {
+    "start": "pnpm --filter @desk-store/web start",
+    "dev": "pnpm --filter @desk-store/web dev",
+    "data": "pnpm --filter @desk-store/web data",
+    "build": "pnpm --filter @desk-store/web build",
+    "typecheck": "pnpm --filter @desk-store/web typecheck"
+  }
+}

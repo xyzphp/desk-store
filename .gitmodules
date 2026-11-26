@@ -1,0 +1,4 @@
+[submodule "desk-ui"]
+	path = desk-ui
+	url = https://github.com/xyzphp/desk-ui.git
+	branch = main

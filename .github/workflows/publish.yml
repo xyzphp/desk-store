@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -32,16 +34,14 @@ jobs:
           go run ./cmd/appcheck build -out dist/public \
             -previous "$(jq -r .homepage store.config.json)api/v1" \
             -download-base "https://github.com/${{ github.repository }}/releases/download"
+      # 网站按 workspace:* 使用 desk-ui 子模块中的组件库源码，工作区与锁文件在仓库根目录。
       - uses: pnpm/action-setup@v4
-        with:
-          package_json_file: web/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: web/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
       - name: Build the website
-        working-directory: web
         run: |
           pnpm install --frozen-lockfile
           pnpm build

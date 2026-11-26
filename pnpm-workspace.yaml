@@ -1,0 +1,5 @@
+# 商店网站与组件库源码（git 子模块 desk-ui）同属一个 pnpm 工作区：
+# 网站按 workspace:* 直接使用组件库源码，开发、构建与发布都不经 npm。
+packages:
+  - web
+  - desk-ui/packages/ui

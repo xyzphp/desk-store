@@ -1,9 +1,36 @@
-/* 商店网站布局。颜色、圆角与字体全部来自 @xyzos/desk-ui 的设计令牌。 */
-html,
-body {
-  margin: 0;
-  background: var(--bg-win);
-  color: var(--text);
+/* 商店网站布局。颜色、圆角与字体全部来自 @xyzos/desk-ui 的设计令牌；
+   应用卡片、详情布局、截图与信息面板直接使用组件库组件，这里只保留站点外框与页面排版。 */
+
+/* 站点级的元素规则放在 ds 之前的层里，不覆盖组件库组件内部的标题与链接样式。 */
+@layer store-base, ds;
+
+@layer store-base {
+  html,
+  body {
+    margin: 0;
+    background: var(--bg-win);
+    color: var(--text);
+  }
+
+  .store-page a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .store-page a:hover {
+    text-decoration: underline;
+  }
+
+  .store-section h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    line-height: 1.3;
+  }
+
+  .store-section h2 {
+    margin: 0 0 12px;
+    font-size: 18px;
+  }
 }
 
 .store-page {
@@ -12,15 +39,6 @@ body {
   color: var(--text);
   font-size: 14px;
   line-height: 1.6;
-}
-
-.store-page a {
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.store-page a:hover {
-  text-decoration: underline;
 }
 
 .store-header {
@@ -123,17 +141,6 @@ body {
   margin-top: 32px;
 }
 
-.store-section h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  line-height: 1.3;
-}
-
-.store-section h2 {
-  margin: 0 0 12px;
-  font-size: 18px;
-}
-
 .store-section-head {
   display: flex;
   align-items: baseline;
@@ -227,93 +234,9 @@ body {
   color: var(--text-2);
 }
 
-/* 应用卡片与列表 */
-.store-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 16px;
+/* 应用列表 */
+.store-card-list {
   margin-top: 16px;
-}
-
-.store-page .store-card {
-  display: flex;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-  color: var(--text);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.store-page .store-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--text) 8%, transparent);
-  text-decoration: none;
-}
-
-.store-page .store-card:focus-visible {
-  outline: 2px solid var(--focus-outline);
-  outline-offset: 2px;
-}
-
-.store-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.store-card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.store-card-summary {
-  color: var(--text-2);
-  font-size: 13px;
-}
-
-.store-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  color: var(--text-2);
-  font-size: 12px;
-}
-
-.store-app-icon {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  overflow: hidden;
-  border-radius: calc(12px * var(--ds-radius-scale));
-  background: var(--hover);
-  color: var(--text-2);
-  font-weight: 600;
-}
-
-.store-app-icon--md {
-  width: 52px;
-  height: 52px;
-}
-
-.store-app-icon--lg {
-  width: 88px;
-  height: 88px;
-  border-radius: calc(20px * var(--ds-radius-scale));
-  font-size: 28px;
-}
-
-.store-app-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .store-list-head {
@@ -340,77 +263,19 @@ body {
   font-size: 13px;
 }
 
-.store-detail-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.store-detail-title {
-  flex: 1;
-  min-width: 240px;
-}
-
-.store-detail-title p {
-  margin: 0;
-  color: var(--text-2);
-  font-size: 15px;
-}
-
-.store-detail .ds-notice {
-  margin-bottom: 16px;
-}
-
-.store-detail-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 32px;
-  margin-top: 8px;
-}
-
-.store-detail-main > section + section {
-  margin-top: 32px;
-}
-
-.store-detail-side {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.store-panel {
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-}
-
-.store-panel h2 {
-  margin: 0 0 10px;
-  font-size: 15px;
-}
-
 .store-install-steps {
-  margin: 0 0 10px;
+  margin: 0;
   padding-left: 20px;
-}
-
-.store-install-steps + .ds-code-block {
-  margin-bottom: 10px;
 }
 
 .store-permissions {
   display: grid;
   gap: 8px;
-  margin: 0 0 10px;
+  margin: 0;
   padding-left: 18px;
 }
 
-.store-permissions code,
-.store-facts code,
-.store-hash {
+.store-permissions code {
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--hover);
@@ -421,64 +286,6 @@ body {
 
 .store-permissions code + code {
   margin-left: 4px;
-}
-
-.store-facts {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: 8px 12px;
-  margin: 0;
-}
-
-.store-facts dt {
-  color: var(--text-2);
-}
-
-.store-facts dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.store-screenshots {
-  display: grid;
-  grid-auto-columns: minmax(280px, 1fr);
-  grid-auto-flow: column;
-  gap: 12px;
-  overflow-x: auto;
-}
-
-.store-screenshots img {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
-
-.store-versions {
-  display: grid;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.store-version {
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-}
-
-.store-version-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.store-hash {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-2);
 }
 
 .store-markdown {
@@ -499,11 +306,6 @@ body {
 .store-markdown td:first-child,
 .store-markdown th:first-child {
   white-space: nowrap;
-}
-
-.store-markdown--compact {
-  margin-top: 6px;
-  font-size: 13px;
 }
 
 /* 文档 */
@@ -567,7 +369,6 @@ body {
 }
 
 @media (max-width: 900px) {
-  .store-detail-grid,
   .store-docs {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -596,7 +397,6 @@ body {
     font-size: 30px;
   }
 
-  .store-grid,
   .store-split {
     grid-template-columns: minmax(0, 1fr);
   }

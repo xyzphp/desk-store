@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { SearchField, SegmentedControl } from '@xyzos/desk-ui';
+import { AppCardGrid, SearchField, SegmentedControl } from '@xyzos/desk-ui';
 import { categoryLabels, fetchIndex } from '../api';
-import { AppCard } from '../components/AppCard';
+import { StoreAppCard } from '../components/StoreAppCard';
 import { navigate } from '../router';
 import { useData } from '../useData';
 
@@ -43,11 +43,11 @@ export function AppList({ category = 'all' }: { category?: string }) {
       {index.status === 'loading' && <p className="store-muted">正在读取应用列表…</p>}
       {index.status === 'error' && <p className="store-muted">应用列表读取失败：{index.message}</p>}
       {index.status === 'ready' && visible.length === 0 && <p className="store-muted">没有符合条件的应用。</p>}
-      <div className="store-grid">
+      <AppCardGrid aria-label="应用列表" className="store-card-list">
         {visible.map((app) => (
-          <AppCard key={app.slug} app={app} />
+          <StoreAppCard key={app.slug} app={app} headingLevel={2} />
         ))}
-      </div>
+      </AppCardGrid>
     </section>
   );
 }

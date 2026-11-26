@@ -27,6 +27,7 @@ An open-source app store for browser desktops. Apps are submitted as source code
 | `cmd/appcheck/` | 校验、打包、生成数据与签名的命令行工具 |
 | `internal/build/` | 从 `apps/` 生成商店静态数据 |
 | `web/` | 商店网站（React + [`@xyzos/desk-ui`](https://github.com/xyzphp/desk-ui)） |
+| `desk-ui/` | 组件库 desk-ui 的 git 子模块，网站直接使用其源码 |
 | `docs/` | 站点文档、应用开发文档与自建文档，网站构建时一并发布 |
 
 ## 开发应用
@@ -43,14 +44,16 @@ go run ./cmd/appcheck pack apps/my-app    # 打包后在自己的系统中手动
 
 ## 本地预览网站
 
-需要 Go 1.26+、Node 22+ 与 pnpm：
+需要 Go 1.26+、Node 22+ 与 pnpm。网站的组件来自 git 子模块 `desk-ui/`（按 `workspace:*` 直接使用源码，不经 npm），克隆时带上子模块：
 
 ```sh
-cd web
-pnpm install
-pnpm start   # 生成并用本地联调密钥签名商店数据，再启动网站：http://localhost:5180
+git clone --recurse-submodules https://github.com/xyzphp/desk-store.git   # 已克隆的执行 git submodule update --init
+pnpm install   # 在仓库根目录执行，网站与组件库同属一个工作区
+pnpm start     # 生成并用本地联调密钥签名商店数据，再启动网站：http://localhost:5180
 # 只改网站代码时可以直接 pnpm dev；改了 apps/ 后重新运行 pnpm data
 ```
+
+更新组件库：`git submodule update --remote desk-ui`，运行 `pnpm install && pnpm typecheck && pnpm build` 后提交新的子模块指针。
 
 ## 在系统中使用
 
