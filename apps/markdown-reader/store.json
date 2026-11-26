@@ -1,0 +1,8 @@
+{
+  "summary": "格式 2 纯前端示例：用系统组件库阅读 Markdown 文件",
+  "category": "developer",
+  "tags": ["示例", "Markdown"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/desk-store"
+}

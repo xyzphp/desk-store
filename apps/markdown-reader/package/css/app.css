@@ -1,0 +1,12 @@
+/* 只做页面排版；颜色与字体来自组件库令牌，随系统浅色 / 深色主题变化。 */
+html, body, #root { height: 100%; margin: 0; }
+.md-app { height: 100%; padding: var(--ds-space-lg); overflow: auto; }
+.md-doc { line-height: 1.7; font-size: 14px; }
+.md-doc.md-small { font-size: 13px; }
+.md-doc.md-large { font-size: 16px; }
+.md-doc h1, .md-doc h2, .md-doc h3 { line-height: 1.3; margin: 1.2em 0 0.5em; }
+.md-doc pre { background: var(--ds-code-block-bg); color: var(--ds-code-block-text); padding: var(--ds-space-md); border-radius: var(--ds-radius-md); overflow: auto; }
+.md-doc.md-wrap pre { white-space: pre-wrap; word-break: break-word; }
+.md-doc blockquote { margin: 0; padding-left: var(--ds-space-md); border-left: 3px solid var(--accent); opacity: 0.85; }
+.md-doc .md-link { color: var(--accent); }
+.md-doc hr { border: 0; border-top: 1px solid currentColor; opacity: 0.2; }

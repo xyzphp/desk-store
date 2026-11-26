@@ -125,7 +125,7 @@ package/
 
 平台接口 v1 的能力名：`identity`、`directory.pick`、`ui`、`notify`、`files.pick`、`files.save`、`files.reference`、`workspace.state`、`image.sanitize`、`ai.complete`、`ai.image`、`tasks`、`realtime`、`audit`。
 
-扩展点：`settings`、`open_with`、`widget`、`lifecycle`、`account_deleted`、`health`、`search`、`notification_action`、`export`。各能力与扩展点的接口细节由目标系统的平台接口文档定义；目标系统只支持其中一部分时，商店按第 10 节的能力标记显示“当前系统不支持”。
+扩展点：`settings`、`open_with`、`widget`、`lifecycle`、`account_deleted`、`health`、`search`、`notification_action`、`export`。界面页面可用的能力与声明式扩展点见[平台接口 v1](04-platform-v1.md)，其余细节由目标系统的平台接口文档定义；目标系统只支持其中一部分时，商店按第 10 节的能力标记显示“当前系统不支持”。
 
 ## 7. 源码与构建
 

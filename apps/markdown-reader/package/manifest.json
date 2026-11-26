@@ -1,0 +1,53 @@
+{
+  "format": 2,
+  "slug": "markdown-reader",
+  "name": "Markdown 阅读器",
+  "version": "1.0.0",
+  "description": "格式 2 纯前端示例：从文件管理用它打开 Markdown 文件，使用系统组件库、应用设置与平台接口。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "window": { "width": 760, "height": 560 },
+  "requires": { "platform": 1 },
+  "access": {
+    "permissions": [{ "name": "remind", "title": "给自己发阅读提醒", "default": true }],
+    "default_grant": "all_accounts"
+  },
+  "surfaces": {
+    "home": "/",
+    "window": {
+      "pages": [
+        { "path": "/", "visibility": "app" },
+        { "path": "/remind/", "visibility": "permission:remind" }
+      ]
+    }
+  },
+  "platform": {
+    "uses": ["identity", "notify", "ui", "workspace.state", "files.pick"],
+    "provides": {
+      "settings": {
+        "fields": [
+          {
+            "key": "font_size",
+            "type": "select",
+            "title": "正文字号",
+            "options": [
+              { "value": "small", "title": "小" },
+              { "value": "medium", "title": "中" },
+              { "value": "large", "title": "大" }
+            ],
+            "default": "medium"
+          },
+          { "key": "wrap_code", "type": "boolean", "title": "代码块自动换行", "default": true },
+          {
+            "key": "empty_hint",
+            "type": "text",
+            "title": "未打开文件时的提示",
+            "maxLength": 100,
+            "default": "在文件管理中右键 Markdown 文件选择“用 Markdown 阅读器 打开”，或点击“打开文件”。"
+          }
+        ]
+      },
+      "open_with": { "types": ["text/markdown", ".md", ".markdown"] }
+    }
+  }
+}
