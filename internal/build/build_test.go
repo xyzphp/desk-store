@@ -39,7 +39,7 @@ func writeNotesApp(t *testing.T, root, version string, migrations map[string]str
 	writeFile(t, filepath.Join(dir, "package", "icon.svg"), "<svg/>")
 	writeFile(t, filepath.Join(dir, "build.json"), `{"backend":{"toolchain":"go@1.26","abi":1}}`)
 	writeFile(t, filepath.Join(dir, "backend", "go.mod"), "module example.com/notes-backend\n\ngo 1.26.10\n")
-	writeFile(t, filepath.Join(dir, "backend", "main.go"), "package main\n\nfunc main() {}\n")
+	writeFile(t, filepath.Join(dir, "backend", "main.go"), "package main\n\n//go:wasmexport handle\nfunc handle() int32 { return 0 }\n\nfunc main() {}\n")
 	for name, sql := range migrations {
 		writeFile(t, filepath.Join(dir, "package", "backend", "migrations", "shared", name), sql)
 	}

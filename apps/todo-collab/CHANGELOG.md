@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.1.1
+
+- 修复优先级 `<Select>` 使用 `<option>` 子节点与 `e.currentTarget.value` 读取值的问题，并将看板删除按钮改为独立的 `quiet` 按钮。
+
 ## 1.1.0
 
 - 追加共享库迁移 `0002_add-priority.sql`，为任务增加优先级字段（`low` / `normal` / `high`）与索引。

@@ -156,27 +156,30 @@ function App() {
     ),
     state.boards.map((board) =>
       h(
-        'button',
+        'div',
         {
           key: board.id,
-          type: 'button',
-          className: 'tc-board-item',
+          className: 'tc-board-row',
           'data-active': board.id === activeBoardId ? 'true' : 'false',
-          onClick: () => setActiveBoardId(board.id),
         },
-        h('span', null, board.title),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'tc-board-item',
+            onClick: () => setActiveBoardId(board.id),
+          },
+          board.title,
+        ),
         canManageBoard &&
           state.boards.length > 1 &&
           h(
             Button,
             {
               size: 'sm',
-              variant: 'ghost',
+              variant: 'quiet',
               disabled: busy,
-              onClick: (e) => {
-                e.stopPropagation();
-                void runAction(() => backendJSON(`/boards/${board.id}`, { method: 'DELETE' }));
-              },
+              onClick: () => void runAction(() => backendJSON(`/boards/${board.id}`, { method: 'DELETE' })),
             },
             '删除',
           ),
@@ -251,16 +254,18 @@ function App() {
             disabled: busy,
             onChange: (e) => setNewTaskTitle(e.currentTarget.value),
           }),
-          h(Select, {
-            value: newTaskPriority || state.defaultPriority,
-            disabled: busy,
-            options: [
-              { value: 'high', label: '高优先级' },
-              { value: 'normal', label: '中优先级' },
-              { value: 'low', label: '低优先级' },
-            ],
-            onChange: (value) => setNewTaskPriority(value),
-          }),
+          h(
+            Select,
+            {
+              value: newTaskPriority || state.defaultPriority,
+              disabled: busy,
+              'aria-label': '优先级',
+              onChange: (e) => setNewTaskPriority(e.currentTarget.value),
+            },
+            h('option', { value: 'high' }, '高优先级'),
+            h('option', { value: 'normal' }, '中优先级'),
+            h('option', { value: 'low' }, '低优先级'),
+          ),
           h(Button, { type: 'submit', variant: 'primary', disabled: busy || !newTaskTitle.trim() }, '新增任务'),
         ),
       ),

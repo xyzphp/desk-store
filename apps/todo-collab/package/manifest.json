@@ -2,7 +2,7 @@
   "format": 2,
   "slug": "todo-collab",
   "name": "待办协作",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "团队共享待办看板：支持应用内权限分工、个人置顶隔离存储与版本化数据库迁移。",
   "entry": "index.html",
   "icon": "icon.svg",
