@@ -10,17 +10,17 @@ import (
 	"github.com/xyzphp/desk-store/pkg/appspec"
 )
 
-// 应用目录允许出现的顶层条目。src/ 存放需要构建的源码（不进入安装包），
-// LICENSE 用于应用自带的许可证全文。
+// 应用目录允许出现的顶层条目。src/（界面源码）与 backend/（后端源码）由 CI 按 build.json 构建，
+// 源码本身不进入安装包；LICENSE 用于应用自带的许可证全文。
 var appDirEntries = map[string]bool{
 	"package": true, "store.json": true, "README.md": true, "CHANGELOG.md": true,
-	"screenshots": true, "src": true, "LICENSE": true,
+	"screenshots": true, "src": true, "backend": true, "build.json": true, "LICENSE": true,
 }
 
 // App 是 apps/<slug>/ 目录的内容。
 type App struct {
 	Dir         string
-	Package     *appspec.Package
+	Package     *appspec.Package // 有 build.json 时为 package/ 与构建产物合并后的内容
 	Meta        appspec.Meta
 	Readme      string
 	ChangeLog   string
@@ -41,10 +41,26 @@ func LoadApp(dir string) (*App, error) {
 			continue
 		}
 		if !appDirEntries[entry.Name()] {
-			return nil, fmt.Errorf("应用目录中不允许出现 %q（允许：package/、store.json、README.md、CHANGELOG.md、screenshots/、src/、LICENSE）", entry.Name())
+			return nil, fmt.Errorf("应用目录中不允许出现 %q（允许：package/、store.json、README.md、CHANGELOG.md、screenshots/、src/、backend/、build.json、LICENSE）", entry.Name())
 		}
 	}
-	pkg, err := appspec.ParseDir(filepath.Join(dir, "package"))
+	if err := checkNoPrebuilt(filepath.Join(dir, "package")); err != nil {
+		return nil, err
+	}
+	spec, err := loadBuildSpec(dir)
+	if err != nil {
+		return nil, err
+	}
+	packageDir := filepath.Join(dir, "package")
+	if spec != nil {
+		stage, cleanup, err := stagePackage(dir, spec)
+		if err != nil {
+			return nil, err
+		}
+		defer cleanup()
+		packageDir = stage
+	}
+	pkg, err := appspec.ParseDir(packageDir)
 	if err != nil {
 		return nil, fmt.Errorf("package/：%w", err)
 	}

@@ -31,12 +31,14 @@ type Config struct {
 
 // Options 控制一次构建。
 type Options struct {
-	AppsDir      string // 应用源码目录，默认 apps
-	ConfigPath   string // 商店配置，默认 store.config.json
-	OutDir       string // 输出目录；数据写入 OutDir/api/v1
-	Previous     string // 已发布数据（api/v1 目录或其 URL），为空表示首次发布
-	DownloadBase string // 安装包下载前缀（如 GitHub Release 下载地址）；为空时使用站内相对地址
-	Now          time.Time
+	AppsDir    string // 应用源码目录，默认 apps
+	ConfigPath string // 商店配置，默认 store.config.json
+	// AdvisoriesDir 是安全通告源文件目录（每条通告一个 .json），默认 advisories；目录不存在时不发布通告。
+	AdvisoriesDir string
+	OutDir        string // 输出目录；数据写入 OutDir/api/v1
+	Previous      string // 已发布数据（api/v1 目录或其 URL），为空表示首次发布
+	DownloadBase  string // 安装包下载前缀（如 GitHub Release 下载地址）；为空时使用站内相对地址
+	Now           time.Time
 }
 
 // NewVersion 是本次构建新增、需要上传与签名的版本。
@@ -63,6 +65,9 @@ func Run(options Options) (Result, error) {
 	}
 	if options.ConfigPath == "" {
 		options.ConfigPath = "store.config.json"
+	}
+	if options.AdvisoriesDir == "" {
+		options.AdvisoriesDir = "advisories"
 	}
 	if options.Now.IsZero() {
 		options.Now = time.Now().UTC()
@@ -133,10 +138,20 @@ func Run(options Options) (Result, error) {
 	}
 	info := appspec.StoreInfo{
 		Schema: appspec.CatalogSchema, ID: config.ID, Name: config.Name, Description: config.Description,
-		Homepage: config.Homepage, Access: config.Access, Formats: []int{1}, Keys: config.Keys,
+		Homepage: config.Homepage, Access: config.Access, Formats: []int{1, 2}, Keys: config.Keys,
 	}
 	if info.Keys == nil {
 		info.Keys = []appspec.PublicKey{}
+	}
+	advisories, err := loadAdvisories(options.AdvisoriesDir, now)
+	if err != nil {
+		return Result{}, err
+	}
+	if advisories != nil {
+		info.Advisories = appspec.AdvisoriesFile
+		if err := writeJSON(filepath.Join(apiDir, appspec.AdvisoriesFile), advisories); err != nil {
+			return Result{}, err
+		}
 	}
 	if err := writeJSON(filepath.Join(apiDir, "store.json"), info); err != nil {
 		return Result{}, err
@@ -194,6 +209,15 @@ func buildApp(app *App, prior *appspec.AppDetail, config Config, options Options
 				return appspec.AppDetail{}, nil, fmt.Errorf("新版本 %s 必须高于已发布的 %s", manifest.Version, version.Version)
 			}
 		}
+		migrations := appspec.MigrationDigests(app.Package.Files)
+		if published := latestVersion(versions); published != nil {
+			if err := appspec.CompareMigrations(published.Migrations, migrations); err != nil {
+				return appspec.AppDetail{}, nil, fmt.Errorf("与已发布的 %s 相比：%w", published.Version, err)
+			}
+		}
+		if len(migrations) == 0 {
+			migrations = nil
+		}
 		tag := slug + "@" + manifest.Version
 		downloadURL := path.Join("packages", fileName)
 		if options.DownloadBase != "" {
@@ -202,6 +226,8 @@ func buildApp(app *App, prior *appspec.AppDetail, config Config, options Options
 		versions = append(versions, appspec.Version{
 			Version: manifest.Version, Format: manifest.Format, SHA256: sum, Size: len(zipData), URL: downloadURL,
 			PublishedAt: now, Changelog: app.Changelog(manifest.Version), Permissions: manifest.Summarize(),
+			Components: manifest.Components(), Requires: requirements(manifest),
+			Capabilities: manifest.Capabilities(), Migrations: migrations,
 		})
 		created = &NewVersion{Slug: slug, Version: manifest.Version, Tag: tag, File: filepath.ToSlash(filepath.Join("api", "v1", "packages", fileName))}
 	}
@@ -231,20 +257,75 @@ func buildApp(app *App, prior *appspec.AppDetail, config Config, options Options
 	}, created, nil
 }
 
-func indexEntry(detail appspec.AppDetail, now string) appspec.IndexEntry {
-	capabilities := []string{}
-	updatedAt := now
-	for _, version := range detail.Versions {
-		if version.Version == detail.LatestVersion {
-			capabilities = version.Permissions.Capabilities
-			updatedAt = version.PublishedAt
+// requirements 只为格式 2 写出平台要求；格式 1 不依赖平台接口。
+func requirements(manifest appspec.Manifest) *appspec.Requirements {
+	if manifest.Format < 2 {
+		return nil
+	}
+	return &appspec.Requirements{Platform: manifest.RequiredPlatform()}
+}
+
+// latestVersion 返回已发布版本中版本号最高的一个（含已撤回的版本：它的迁移可能已在目标系统执行过）。
+func latestVersion(versions []appspec.Version) *appspec.Version {
+	var latest *appspec.Version
+	for i := range versions {
+		if latest == nil || appspec.CompareVersions(versions[i].Version, latest.Version) > 0 {
+			latest = &versions[i]
 		}
 	}
-	return appspec.IndexEntry{
+	return latest
+}
+
+func indexEntry(detail appspec.AppDetail, now string) appspec.IndexEntry {
+	entry := appspec.IndexEntry{
 		Slug: detail.Slug, Name: detail.Name, Summary: detail.Summary, Category: detail.Category, Tags: detail.Tags,
 		Icon: detail.Icon, LatestVersion: detail.LatestVersion, Pricing: detail.Pricing,
-		Capabilities: capabilities, Withdrawn: detail.Withdrawn, UpdatedAt: updatedAt,
+		Capabilities: []string{}, Withdrawn: detail.Withdrawn, UpdatedAt: now,
 	}
+	for _, version := range detail.Versions {
+		if version.Version == detail.LatestVersion {
+			entry.Capabilities = version.Permissions.Capabilities
+			entry.UpdatedAt = version.PublishedAt
+			entry.Components, entry.Requires = version.Components, version.Requires
+		}
+	}
+	return entry
+}
+
+// loadAdvisories 读取安全通告源文件；目录不存在时返回 nil（不发布通告）。
+func loadAdvisories(dir, now string) (*appspec.Advisories, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "*.json"))
+	if err != nil {
+		return nil, err
+	}
+	if _, statErr := os.Stat(dir); errors.Is(statErr, os.ErrNotExist) {
+		return nil, nil
+	}
+	result := &appspec.Advisories{Schema: 1, GeneratedAt: now, Advisories: []appspec.Advisory{}}
+	seen := map[string]bool{}
+	for _, file := range files {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		var advisory appspec.Advisory
+		if err := strictJSON(raw, &advisory); err != nil {
+			return nil, fmt.Errorf("%s 无法解析：%w", file, err)
+		}
+		if err := advisory.Validate(); err != nil {
+			return nil, fmt.Errorf("%s：%w", file, err)
+		}
+		if strings.TrimSuffix(filepath.Base(file), ".json") != advisory.ID {
+			return nil, fmt.Errorf("%s：文件名必须与通告编号 %s 一致", file, advisory.ID)
+		}
+		if seen[advisory.ID] {
+			return nil, fmt.Errorf("通告编号 %s 重复", advisory.ID)
+		}
+		seen[advisory.ID] = true
+		result.Advisories = append(result.Advisories, advisory)
+	}
+	sort.Slice(result.Advisories, func(i, j int) bool { return result.Advisories[i].ID < result.Advisories[j].ID })
+	return result, nil
 }
 
 // LoadConfig 读取并校验商店配置。

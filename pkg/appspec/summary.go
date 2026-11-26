@@ -23,6 +23,14 @@ type Summary struct {
 	Proxies       []ProxySummary `json:"proxies"`
 	DesktopWidget bool           `json:"desktopWidget"`
 	Capabilities  []string       `json:"capabilities"`
+
+	// 格式 2，见 summary_v2.go；格式 1 的应用省略这些字段。
+	Access   *AccessSummary   `json:"access,omitempty"`
+	Surfaces *SurfacesSummary `json:"surfaces,omitempty"`
+	Backend  *BackendSummary  `json:"backend,omitempty"`
+	Platform *PlatformSummary `json:"platform,omitempty"`
+	MCP      *MCPSummary      `json:"mcp,omitempty"`
+	Skills   []SkillInfo      `json:"skills,omitempty"`
 }
 
 // ProxySummary 描述一条代理的可达范围。
@@ -41,8 +49,11 @@ type ProxySummary struct {
 // Summarize 生成权限摘要；切片总是非 nil，便于 JSON 输出为空数组。
 func (m Manifest) Summarize() Summary {
 	summary := Summary{Entry: "entry", GatewayAPI: append([]string{}, m.GatewayAPI...), Proxies: []ProxySummary{}, DesktopWidget: m.DesktopWidget}
-	if m.GatewayPage != nil {
+	switch {
+	case m.GatewayPage != nil:
 		summary.Entry = "gateway_page"
+	case !m.HasUI():
+		summary.Entry = "none"
 	}
 	for _, proxy := range m.Proxies {
 		summary.Proxies = append(summary.Proxies, ProxySummary{
@@ -52,6 +63,7 @@ func (m Manifest) Summarize() Summary {
 		})
 	}
 	summary.Capabilities = m.Capabilities()
+	m.summarizeFormatTwo(&summary)
 	return summary
 }
 
@@ -76,6 +88,7 @@ func (m Manifest) Capabilities() []string {
 	if m.Window != nil {
 		capabilities = append(capabilities, CapabilityWindow)
 	}
+	capabilities = append(capabilities, m.formatTwoCapabilities()...)
 	sort.Strings(capabilities)
 	return capabilities
 }
@@ -136,15 +149,18 @@ func Diff(previous, current Summary) []string {
 	if current.DesktopWidget != previous.DesktopWidget {
 		changes = append(changes, fmt.Sprintf("桌面卡片改为 %t", current.DesktopWidget))
 	}
-	return changes
+	return append(changes, diffFormatTwo(previous, current)...)
 }
 
 // Markdown 把摘要渲染成评审用的 Markdown。
 func (s Summary) Markdown() string {
 	var out strings.Builder
-	if s.Entry == "gateway_page" {
+	switch s.Entry {
+	case "gateway_page":
 		out.WriteString("- 页面来源：网关代理的上游页面（gateway_page）\n")
-	} else {
+	case "none":
+		out.WriteString("- 没有窗口界面\n")
+	default:
 		out.WriteString("- 页面来源：包内静态页面（entry）\n")
 	}
 	if len(s.GatewayAPI) == 0 {
@@ -170,6 +186,7 @@ func (s Summary) Markdown() string {
 	if s.DesktopWidget {
 		out.WriteString("- 提供桌面卡片\n")
 	}
+	s.markdownFormatTwo(&out)
 	return out.String()
 }
 

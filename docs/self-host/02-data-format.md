@@ -36,6 +36,10 @@
 | `permissions` | 权限摘要：页面来源、`gatewayApi`、代理列表、桌面卡片与能力标记 |
 | `signature` | `{ "keyId": "…", "value": "<base64>" }` |
 
+## 格式 2 与安全通告（草案）
+
+索引与详情中的 `components`、`requires`、版本的 `capabilities`、`migrations` 与扩展后的 `permissions`，以及签名的 `advisories.json`，见 [商店数据格式补充（草案）](../spec/03-catalog.md)。只认识本页字段的客户端可以忽略它们。
+
 ## 签名内容
 
 签名是 Ed25519，对以下文本（每行以 `\n` 结尾）签名：

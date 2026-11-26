@@ -27,6 +27,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # 固定工具链：Go 取 go.mod 的版本，Node 22 + pnpm。应用的界面 / 后端源码（build.json）
+      # 在校验与生成数据时构建；网站按 workspace:* 使用 desk-ui 子模块的源码，工作区与锁文件在仓库根目录。
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Validate apps
         run: go run ./cmd/appcheck check
       - name: Generate store data
@@ -34,13 +42,6 @@ jobs:
           go run ./cmd/appcheck build -out dist/public \
             -previous "$(jq -r .homepage store.config.json)api/v1" \
             -download-base "https://github.com/${{ github.repository }}/releases/download"
-      # 网站按 workspace:* 使用 desk-ui 子模块中的组件库源码，工作区与锁文件在仓库根目录。
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
       - name: Build the website
         run: |
           pnpm install --frozen-lockfile

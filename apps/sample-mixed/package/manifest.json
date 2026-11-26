@@ -1,0 +1,79 @@
+{
+  "format": 2,
+  "slug": "sample-mixed",
+  "name": "混合示例",
+  "version": "1.0.0",
+  "description": "格式 2 的示例：界面、后端、迁移、AI 工具与技能。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "window": { "width": 720, "height": 520 },
+  "permissions": ["proxy.weather"],
+  "proxies": [
+    {
+      "key": "weather",
+      "title": "示例天气接口",
+      "upstream": "https://api.example.com",
+      "auth_type": "none",
+      "paths": ["/weather"],
+      "methods": ["GET"],
+      "pass_query": true
+    }
+  ],
+  "requires": { "platform": 1 },
+  "access": {
+    "permissions": [
+      { "name": "note.write", "title": "写笔记" },
+      { "name": "site.settings", "title": "公开页面设置" }
+    ],
+    "default_grant": "none"
+  },
+  "surfaces": {
+    "home": "/",
+    "window": { "pages": [{ "path": "/settings/", "visibility": "permission:site.settings" }] },
+    "standalone": { "enabled": true },
+    "public": { "pages": [{ "path": "/", "visibility": "public" }], "session": "none" }
+  },
+  "platform": { "uses": ["identity", "notify"], "provides": { "settings": { "fields": [] } } },
+  "backend": {
+    "runtime": "wasm",
+    "abi": 1,
+    "module": "backend/app.wasm",
+    "routes": [
+      { "path": "/notes", "methods": ["GET"], "visibility": "app" },
+      { "path": "/notes", "methods": ["POST"], "visibility": "permission:note.write" },
+      { "path": "/public/*", "methods": ["GET"], "visibility": "public", "rate_limit": "60/min" },
+      { "path": "/tools/*", "methods": ["POST"], "visibility": "permission:note.write" }
+    ],
+    "storage": { "shared": true, "public": true }
+  },
+  "mcp": {
+    "tools": [
+      {
+        "name": "get_weather",
+        "title": "查询天气",
+        "description": "按城市查询示例接口返回的天气",
+        "input_schema": {
+          "type": "object",
+          "properties": { "city": { "type": "string", "description": "城市名" } },
+          "required": ["city"]
+        },
+        "annotations": { "read_only": true },
+        "call": { "proxy": "weather", "method": "GET", "path": "/weather", "query": { "city": "{city}" } }
+      },
+      {
+        "name": "add_note",
+        "title": "新增笔记",
+        "description": "以当前用户身份新增一条笔记",
+        "input_schema": {
+          "type": "object",
+          "properties": { "text": { "type": "string", "maxLength": 2000 } },
+          "required": ["text"]
+        },
+        "annotations": { "destructive": true },
+        "call": { "backend": "/tools/add-note" }
+      }
+    ],
+    "prompts": [{ "name": "summarize_notes", "title": "总结笔记", "file": "mcp/prompts/summarize-notes.md" }]
+  },
+  "skills": ["note-taking"]
+}

@@ -275,6 +275,16 @@
   padding-left: 18px;
 }
 
+.store-ai-item {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.store-ai-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
 .store-permissions code {
   padding: 1px 5px;
   border-radius: 4px;

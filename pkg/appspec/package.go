@@ -36,15 +36,15 @@ func ParseZip(data []byte) (*Package, error) {
 	if len(data) == 0 {
 		return nil, errors.New("安装包内容为空")
 	}
-	if len(data) > MaxCompressedSize {
-		return nil, errors.New("安装包超过大小限制（压缩后 2 MB）")
+	if len(data) > collectLimits.CompressedSize {
+		return nil, fmt.Errorf("安装包超过大小限制（压缩后 %s）", formatSize(collectLimits.CompressedSize))
 	}
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, errors.New("安装包不是有效的 ZIP 文件")
 	}
-	if len(reader.File) > MaxEntryCount {
-		return nil, fmt.Errorf("安装包条目过多（上限 %d）", MaxEntryCount)
+	if len(reader.File) > collectLimits.EntryCount {
+		return nil, fmt.Errorf("安装包条目过多（上限 %d）", collectLimits.EntryCount)
 	}
 	collector := newCollector()
 	for _, entry := range reader.File {
@@ -93,8 +93,8 @@ func ParseDir(dir string) (*Package, error) {
 		if err != nil {
 			return err
 		}
-		if info.Size() > MaxSingleFile {
-			return fmt.Errorf("安装包内的 %q 超过单文件大小限制（1 MB）", filepath.ToSlash(relative))
+		if info.Size() > int64(collectLimits.ModuleSize) {
+			return fmt.Errorf("安装包内的 %q 超过单文件大小限制（%s）", filepath.ToSlash(relative), formatSize(collectLimits.ModuleSize))
 		}
 		content, err := os.ReadFile(current)
 		if err != nil {
@@ -118,8 +118,8 @@ func newCollector() *collector {
 }
 
 func (c *collector) add(name string, content []byte) error {
-	if len(c.pkg.Files)+2 > MaxFileCount {
-		return fmt.Errorf("安装包文件过多（上限 %d，含 manifest.json）", MaxFileCount)
+	if len(c.pkg.Files)+2 > collectLimits.FileCount {
+		return fmt.Errorf("安装包文件过多（上限 %d，含 manifest.json）", collectLimits.FileCount)
 	}
 	if strings.ContainsRune(name, '\\') || strings.HasPrefix(name, "/") {
 		return fmt.Errorf("安装包内存在不安全的文件路径 %q", name)
@@ -132,15 +132,15 @@ func (c *collector) add(name string, content []byte) error {
 		return fmt.Errorf("安装包内存在重复文件 %q", clean)
 	}
 	c.seen[clean] = true
-	if _, ok := FileTypes[strings.ToLower(path.Ext(clean))]; !ok {
+	if !collectLimits.Extensions[strings.ToLower(path.Ext(clean))] {
 		return fmt.Errorf("安装包内存在不允许的文件类型 %q", clean)
 	}
-	if len(content) > MaxSingleFile {
-		return fmt.Errorf("安装包内的 %q 超过单文件大小限制（1 MB）", clean)
+	if len(content) > collectLimits.ModuleSize {
+		return fmt.Errorf("安装包内的 %q 超过单文件大小限制（%s）", clean, formatSize(collectLimits.ModuleSize))
 	}
 	c.pkg.TotalSize += len(content)
-	if c.pkg.TotalSize > MaxPackageSize {
-		return errors.New("安装包解压后超过大小限制（1 MB）")
+	if c.pkg.TotalSize > collectLimits.PackageSize {
+		return fmt.Errorf("安装包解压后超过大小限制（%s）", formatSize(collectLimits.PackageSize))
 	}
 	if clean == "manifest.json" {
 		c.pkg.ManifestRaw = content
@@ -166,12 +166,12 @@ func readZipEntry(entry *zip.File) ([]byte, error) {
 		return nil, fmt.Errorf("无法读取安装包内的 %q", entry.Name)
 	}
 	defer file.Close()
-	content, err := io.ReadAll(io.LimitReader(file, MaxSingleFile+1))
+	content, err := io.ReadAll(io.LimitReader(file, int64(collectLimits.ModuleSize)+1))
 	if err != nil {
 		return nil, fmt.Errorf("无法读取安装包内的 %q", entry.Name)
 	}
-	if len(content) > MaxSingleFile {
-		return nil, fmt.Errorf("安装包内的 %q 超过单文件大小限制（1 MB）", entry.Name)
+	if len(content) > collectLimits.ModuleSize {
+		return nil, fmt.Errorf("安装包内的 %q 超过单文件大小限制（%s）", entry.Name, formatSize(collectLimits.ModuleSize))
 	}
 	return content, nil
 }
@@ -202,8 +202,12 @@ func (p *Package) Pack() ([]byte, error) {
 	if err := writer.Close(); err != nil {
 		return nil, err
 	}
-	if buffer.Len() > MaxCompressedSize {
-		return nil, errors.New("打包结果超过 2 MB")
+	limits, ok := LimitsFor(p.Manifest.Format)
+	if !ok {
+		limits = formatLimits[1]
+	}
+	if buffer.Len() > limits.CompressedSize {
+		return nil, fmt.Errorf("打包结果超过 %s", formatSize(limits.CompressedSize))
 	}
 	return buffer.Bytes(), nil
 }

@@ -31,10 +31,14 @@ package/
 
 | 项 | 格式 1 | 格式 2 |
 | --- | --- | --- |
-| 解压后总量 | 1 MB | 8 MB |
-| 文件数 | 32 | 500 |
+| 解压后总量（含 manifest.json） | 1 MB | 16 MB |
+| ZIP 本体 | 2 MB | 18 MB |
+| 文件数（含 manifest.json） | 32 | 500 |
+| manifest.json | 32 KB | 64 KB |
 | 单文件 | 1 MB | 2 MB（`backend/app.wasm` 8 MB） |
 | 扩展名 | `.html .css .js .json .svg .png .jpg .jpeg .webp .woff2 .txt` | 另加 `.md .sql .wasm .map` |
+
+新增扩展名只能出现在固定位置：`.wasm` 只能是 `backend/app.wasm`，`.sql` 只能在 `backend/migrations/` 下，`.md` 只能在 `skills/` 或 `mcp/prompts/` 下；`skills/` 下只允许 `.md`、`.txt`、`.json`；`backend/` 下只允许模块与 `migrations/`。
 
 `backend/app.wasm` 与 `ui` 构建产物只能由商店 CI 生成，提交到仓库的预编译文件会被 `appcheck` 拒绝（见第 7 节）。
 
@@ -51,6 +55,8 @@ package/
 | `skills` | 技能列表，见第 9 节 |
 
 格式 1 的 `permissions`（`proxy.<key>`）含义不变；应用内权限使用 `access.permissions`，两者不要混用。
+
+格式 2 的应用至少包含界面（`entry` / `gateway_page`）、`mcp` 或 `skills` 之一；没有界面的应用不能声明 `desktop_widget`、`widget`、`window` 与 `surfaces`。
 
 ## 4. access：应用内权限与默认授予
 
@@ -182,8 +188,8 @@ apps/<slug>/
 { "skills": ["writing-style", "seo-checklist"] }
 ```
 
-- 每项对应 `package/skills/<name>/SKILL.md`，文件以 YAML 头开始，必须有 `name`（与目录名一致）与 `description`（1–300 个字符），正文为步骤与规则。
-- 可带 `references/` 下的参考文件（`.md`、`.txt`、`.json`）；**不允许脚本**，需要执行的动作写成本应用的工具，技能中按工具名引用，`appcheck` 校验引用存在。
+- 每项对应 `package/skills/<name>/SKILL.md`，名称为 `^[a-z][a-z0-9-]{1,47}$`。文件以 `---` 包围的头部开始，必须有 `name`（与目录名一致）与 `description`（1–300 个字符），可选 `tools`（引用的本应用工具名，写成 `[a, b]` 或逐行 `- a`）；头部只支持 `key: value` 与这两种列表写法。正文为步骤与规则。
+- 可带 `references/` 下的参考文件（`.md`、`.txt`、`.json`）；**不允许脚本**，需要执行的动作写成本应用的工具，在头部 `tools` 中列出，`appcheck` 校验这些工具在 `mcp.tools` 中存在。
 - 上限：技能 ≤ 20 个，单个 `SKILL.md` ≤ 32 KB，参考文件合计 ≤ 512 KB。
 
 ## 10. 能力标记

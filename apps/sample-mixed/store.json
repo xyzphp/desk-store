@@ -1,0 +1,8 @@
+{
+  "summary": "格式 2 的示例：界面、后端、迁移、AI 工具与技能组合在一个应用里",
+  "category": "developer",
+  "tags": ["示例", "格式 2"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/desk-store"
+}

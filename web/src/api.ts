@@ -15,7 +15,12 @@ export interface StoreInfo {
   access: 'public' | 'token';
   formats: number[];
   keys: PublicKey[];
+  /** 安全通告文件的相对地址；不发布通告的商店没有这个字段。 */
+  advisories?: string;
 }
+
+/** 应用组件，见 docs/spec/01-package-v2.md。 */
+export type Component = 'ui' | 'backend' | 'mcp' | 'skills';
 
 export interface IndexEntry {
   slug: string;
@@ -29,6 +34,8 @@ export interface IndexEntry {
   capabilities: string[];
   withdrawn: boolean;
   updatedAt: string;
+  components?: Component[];
+  requires?: { platform: number };
 }
 
 export interface StoreIndex {
@@ -51,12 +58,51 @@ export interface ProxySummary {
   passQuery: boolean;
 }
 
+export interface ToolSummary {
+  name: string;
+  title: string;
+  description: string;
+  readOnly: boolean;
+  destructive: boolean;
+  kind: 'backend' | 'declarative' | 'remote';
+}
+
 export interface PermissionSummary {
-  entry: 'entry' | 'gateway_page';
+  entry: 'entry' | 'gateway_page' | 'none';
   gatewayApi: string[];
   proxies: ProxySummary[];
   desktopWidget: boolean;
   capabilities: string[];
+  // 格式 2，见 docs/spec/03-catalog.md 第 4 节。
+  access?: { permissions: { name: string; title: string }[]; defaultGrant: string };
+  surfaces?: { standalone: boolean; public?: { alias?: string; session: string } };
+  backend?: {
+    routes: { path: string; methods: string[]; visibility: string }[];
+    storage: { shared: boolean; public: boolean; account: boolean };
+    http: string[];
+    hooks: string[];
+    schedules: string[];
+    config: { key: string; title: string; secret: boolean }[];
+  };
+  platform?: { uses: string[]; provides: string[] };
+  mcp?: {
+    tools: ToolSummary[];
+    resources: { uri: string; title: string }[];
+    prompts: { name: string; title: string }[];
+    remote?: { proxy: string; pinnedTools: string[] };
+  };
+  skills?: { name: string; description: string; tools?: string[] }[];
+}
+
+export interface Advisory {
+  id: string;
+  slug: string;
+  versions: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  fixedIn?: string;
+  action: 'update' | 'disable';
 }
 
 export interface AppVersion {
@@ -70,6 +116,10 @@ export interface AppVersion {
   changelog?: string;
   permissions: PermissionSummary;
   signature?: { keyId: string; value: string };
+  components?: Component[];
+  requires?: { platform: number };
+  capabilities?: string[];
+  migrations?: Record<string, { id: string; sha256: string }[]>;
 }
 
 export interface AppDetail {
@@ -128,6 +178,45 @@ export const fetchStore = () => cached<StoreInfo>('store.json');
 export const fetchIndex = () => cached<StoreIndex>('index.json');
 export const fetchApp = (slug: string) => cached<AppDetail>(`apps/${encodeURIComponent(slug)}.json`);
 
+/** 读取安全通告；商店不发布通告时返回空列表。网站只做展示，签名由目标系统校验。 */
+export async function fetchAdvisories(): Promise<Advisory[]> {
+  const info = await fetchStore();
+  if (!info.advisories) return [];
+  const data = await cached<{ advisories?: Advisory[] }>(info.advisories);
+  return data.advisories ?? [];
+}
+
+export type AppType = 'app' | 'mcp' | 'skills' | 'mixed';
+
+/** 按组件得到类型标签：只有界面（可带后端）为应用，只有 MCP 为 MCP，只有技能为技能，其余为混合。 */
+export function appType(components: Component[] | undefined): AppType {
+  const list = components ?? ['ui'];
+  const visible = list.filter((item) => item !== 'backend');
+  if (visible.length === 1 && visible[0] === 'ui') return 'app';
+  if (list.length === 1 && list[0] === 'mcp') return 'mcp';
+  if (list.length === 1 && list[0] === 'skills') return 'skills';
+  return 'mixed';
+}
+
+export const appTypeLabels: Record<AppType, string> = { app: '应用', mcp: 'MCP', skills: '技能', mixed: '混合' };
+
+export const visibilityLabels: Record<string, string> = {
+  public: '公开',
+  signed_in: '登录即可',
+  app: '应用用户',
+};
+
+/** 可见范围的中文说明；permission:<name> 显示为对应的应用内权限名称。 */
+export function visibilityLabel(value: string, permissions: { name: string; title: string }[] = []) {
+  const name = value.startsWith('permission:') ? value.slice('permission:'.length) : '';
+  if (name) return `需要「${permissions.find((item) => item.name === name)?.title ?? name}」`;
+  return visibilityLabels[value] ?? value;
+}
+
+export const severityLabels: Record<Advisory['severity'], string> = { low: '低', medium: '中', high: '高', critical: '严重' };
+
+export const storageLabels: Record<string, string> = { shared: '共享数据', public: '公开数据', account: '按用户隔离的数据' };
+
 export const categoryLabels: Record<string, string> = {
   productivity: '效率',
   tools: '工具',
@@ -151,7 +240,30 @@ export const capabilityLabels: Record<string, string> = {
   widget: '数据卡片',
   'widget.account_selector': '卡片账号切换',
   window: '自定义窗口尺寸',
+  'format.2': '格式 2',
+  'surface.standalone': '独立页面',
+  'surface.public': '公开页面',
+  'surface.public.session': '公开页面读取登录状态',
+  'access.permissions': '应用内权限',
+  'access.default_grant': '默认授予',
+  'mcp.tools': 'AI 工具',
+  'mcp.declarative': '声明式工具',
+  'mcp.remote': '远程 MCP',
+  'mcp.resources': 'AI 资源',
+  'mcp.prompts': '提示模板',
+  skills: '技能',
 };
+
+/** 能力标记的展示名称；没有登记的标记按前缀给出通用说明。 */
+export function capabilityLabel(mark: string) {
+  if (capabilityLabels[mark]) return capabilityLabels[mark];
+  if (mark.startsWith('platform.')) return `平台接口 v${mark.slice('platform.'.length)}`;
+  if (mark.startsWith('backend.')) return '后端模块';
+  if (mark.startsWith('storage.')) return storageLabels[mark.slice('storage.'.length)] ?? mark;
+  if (mark.startsWith('uses.')) return `平台能力 ${mark.slice('uses.'.length)}`;
+  if (mark.startsWith('provides.')) return `扩展点 ${mark.slice('provides.'.length)}`;
+  return mark;
+}
 
 export function formatBytes(size: number) {
   if (size < 1024) return `${size} B`;

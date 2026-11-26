@@ -20,6 +20,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # 固定工具链：Go 取 go.mod 的版本，Node 22 + pnpm。应用的界面 / 后端源码（build.json）
+      # 在校验与生成数据时构建；网站按 workspace:* 使用 desk-ui 子模块的源码，工作区与锁文件在仓库根目录。
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Go format, vet and tests
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; echo "请运行 gofmt"; exit 1; }
@@ -30,6 +38,11 @@ jobs:
       - name: Version rules against the published store
         # 与线上已发布数据对比：改了安装包必须提升版本，已发布的版本号不能复用。
         run: go run ./cmd/appcheck build -out dist/public -previous "$(jq -r .homepage store.config.json)api/v1"
+      - name: Reproducible builds
+        # 同一提交构建两次，安装包必须逐字节一致（含从源码构建的界面与后端模块）。
+        run: |
+          go run ./cmd/appcheck build -out dist/repro -previous "$(jq -r .homepage store.config.json)api/v1"
+          diff -r dist/public/api/v1/packages dist/repro/api/v1/packages
       - name: Permission summary of changed apps
         if: github.event_name == 'pull_request'
         run: |
@@ -44,13 +57,6 @@ jobs:
               echo "- 删除了 \`$slug\`（发布后会显示为已下架）" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
-      # 网站按 workspace:* 使用 desk-ui 子模块中的组件库源码，工作区与锁文件在仓库根目录。
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
       - name: Build the website
         run: |
           pnpm install --frozen-lockfile

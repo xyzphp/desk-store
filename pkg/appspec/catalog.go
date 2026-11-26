@@ -16,6 +16,12 @@ type StoreInfo struct {
 	Access      string      `json:"access"` // public 匿名访问；token 需要访问令牌
 	Formats     []int       `json:"formats"`
 	Keys        []PublicKey `json:"keys"`
+	Advisories  string      `json:"advisories,omitempty"` // 安全通告文件的相对地址
+}
+
+// Requirements 是应用版本对目标系统的要求。
+type Requirements struct {
+	Platform int `json:"platform"`
 }
 
 // Index 是 api/v1/index.json：全部应用的摘要。
@@ -38,6 +44,9 @@ type IndexEntry struct {
 	Capabilities  []string `json:"capabilities"`
 	Withdrawn     bool     `json:"withdrawn"`
 	UpdatedAt     string   `json:"updatedAt"`
+	// 最新版本的组件与要求；旧数据中可能缺失。
+	Components []string      `json:"components,omitempty"`
+	Requires   *Requirements `json:"requires,omitempty"`
 }
 
 // AppDetail 是 api/v1/apps/{slug}.json。
@@ -75,6 +84,11 @@ type Version struct {
 	Changelog   string     `json:"changelog,omitempty"`
 	Permissions Summary    `json:"permissions"`
 	Signature   *Signature `json:"signature,omitempty"`
+	// 格式 2 起新增，旧版本数据中可能缺失，见 docs/spec/03-catalog.md。
+	Components   []string                     `json:"components,omitempty"`
+	Requires     *Requirements                `json:"requires,omitempty"`
+	Capabilities []string                     `json:"capabilities,omitempty"`
+	Migrations   map[string][]MigrationDigest `json:"migrations,omitempty"`
 }
 
 // Record 返回该版本的签名记录。

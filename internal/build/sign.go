@@ -76,6 +76,13 @@ func Sign(options SignOptions) (int, error) {
 			return 0, err
 		}
 	}
+	if data, err := os.ReadFile(filepath.Join(apiDir, appspec.AdvisoriesFile)); err == nil {
+		if err := os.WriteFile(filepath.Join(apiDir, appspec.AdvisoriesSignatureFile), appspec.SignAdvisories(private, data), 0o644); err != nil {
+			return 0, err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return 0, err
+	}
 	return signed, nil
 }
 
@@ -85,6 +92,19 @@ func VerifyOutput(outDir string) error {
 	var info appspec.StoreInfo
 	if err := readJSON(filepath.Join(apiDir, "store.json"), &info); err != nil {
 		return err
+	}
+	if info.Advisories != "" {
+		data, err := os.ReadFile(filepath.Join(apiDir, filepath.FromSlash(info.Advisories)))
+		if err != nil {
+			return fmt.Errorf("store.json 声明了安全通告，但读取失败：%w", err)
+		}
+		signature, err := os.ReadFile(filepath.Join(apiDir, filepath.FromSlash(info.Advisories)) + ".sig")
+		if err != nil {
+			return errors.New("安全通告缺少签名文件")
+		}
+		if err := appspec.VerifyAdvisories(info.Keys, data, signature); err != nil {
+			return err
+		}
 	}
 	files, err := filepath.Glob(filepath.Join(apiDir, "apps", "*.json"))
 	if err != nil {

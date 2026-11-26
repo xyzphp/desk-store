@@ -1,4 +1,5 @@
-// Package appspec 定义应用安装包（format 1）的结构与校验规则。
+// Package appspec 定义应用安装包（format 1 与 format 2）的结构与校验规则。
+// 格式 2 的合同见仓库 docs/spec/。
 //
 // 规则与 XYZOS 安装时的校验保持一致：商店和 appcheck 用它提前发现问题，
 // 但目标系统安装时仍会独立完整校验，并可能保留更多 slug（例如内建应用标识）。
@@ -17,15 +18,12 @@ import (
 	"strings"
 )
 
-// 包与清单限制。
+// 清单与图标限制；包体积与文件数按格式区分，见 limits.go。
 const (
-	MaxPackageSize    = 1 << 20 // 解压后总量
-	MaxCompressedSize = 2 << 20 // ZIP 本体
-	MaxSingleFile     = 1 << 20
-	MaxIconSize       = 64 << 10
-	MaxFileCount      = 32 // 含 manifest.json
-	MaxEntryCount     = 64
-	MaxManifestSize   = 32 << 10
+	MaxIconSize        = 64 << 10
+	MaxManifestSize    = 32 << 10
+	maxProxyResponse   = 1 << 20
+	maxManifestSizeTwo = 64 << 10
 )
 
 var (
@@ -42,8 +40,12 @@ var reservedSlugs = map[string]bool{
 
 const reservedSlugPrefix = "data-app-"
 
-// FileTypes 是包内允许的扩展名及其 MIME 类型。
+// FileTypes 是包内文件扩展名对应的 MIME 类型；各格式允许哪些扩展名见 limits.go。
 var FileTypes = map[string]string{
+	".md":    "text/markdown; charset=utf-8",
+	".sql":   "application/sql",
+	".wasm":  "application/wasm",
+	".map":   "application/json; charset=utf-8",
 	".html":  "text/html; charset=utf-8",
 	".css":   "text/css; charset=utf-8",
 	".js":    "text/javascript; charset=utf-8",
@@ -75,6 +77,18 @@ type Manifest struct {
 	GatewayAPI    []string     `json:"gateway_api,omitempty"`
 	Permissions   []string     `json:"permissions,omitempty"`
 	Proxies       []Proxy      `json:"proxies,omitempty"`
+
+	// 格式 2 新增，见 docs/spec/01-package-v2.md。
+	Requires *Requires `json:"requires,omitempty"`
+	Access   *Access   `json:"access,omitempty"`
+	Surfaces *Surfaces `json:"surfaces,omitempty"`
+	Platform *Platform `json:"platform,omitempty"`
+	Backend  *Backend  `json:"backend,omitempty"`
+	MCP      *MCP      `json:"mcp,omitempty"`
+	Skills   []string  `json:"skills,omitempty"`
+
+	// skills 解析结果，供摘要使用，不出现在 JSON 中。
+	skillInfo []SkillInfo
 }
 
 // GatewayPage 声明由网关代理加载的上游页面。
@@ -110,13 +124,19 @@ func ParseManifest(raw []byte, files []File) (Manifest, error) {
 	if len(raw) == 0 {
 		return manifest, errors.New("缺少 manifest.json")
 	}
-	if len(raw) > MaxManifestSize {
-		return manifest, errors.New("manifest.json 超过大小限制（32 KB）")
+	if len(raw) > maxManifestSizeTwo {
+		return manifest, errors.New("manifest.json 超过大小限制（格式 1 为 32 KB，格式 2 为 64 KB）")
 	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&manifest); err != nil {
 		return manifest, fmt.Errorf("manifest.json 无法解析：%w", err)
+	}
+	if manifest.Format == 1 && len(raw) > MaxManifestSize {
+		return manifest, errors.New("manifest.json 超过大小限制（32 KB）")
+	}
+	if err := checkFormatLimits(manifest.Format, len(raw), files); err != nil {
+		return manifest, err
 	}
 	if err := manifest.validate(files); err != nil {
 		return manifest, err
@@ -133,8 +153,11 @@ func ValidSlug(value string) bool {
 func ValidVersion(value string) bool { return versionPattern.MatchString(value) }
 
 func (m *Manifest) validate(files []File) error {
-	if m.Format != 1 {
-		return errors.New("manifest 的 format 只支持 1")
+	if m.Format != 1 && m.Format != 2 {
+		return errors.New("manifest 的 format 只支持 1 或 2")
+	}
+	if field := m.formatTwoField(); m.Format == 1 && field != "" {
+		return fmt.Errorf("manifest 使用了格式 2 的字段 %s，format 必须为 2", field)
 	}
 	if !ValidSlug(m.Slug) {
 		return errors.New("manifest 的 slug 只允许 2-32 位小写字母、数字或连字符，且以字母或数字开头、不以连字符结尾")
@@ -151,7 +174,10 @@ func (m *Manifest) validate(files []File) error {
 	if len([]rune(m.Description)) > 400 {
 		return errors.New("manifest 的 description 不能超过 400 个字符")
 	}
-	if (m.Entry == "") == (m.GatewayPage == nil) {
+	if m.Entry != "" && m.GatewayPage != nil {
+		return errors.New("manifest 只能声明 entry 或 gateway_page 其中之一")
+	}
+	if m.Format == 1 && m.Entry == "" && m.GatewayPage == nil {
 		return errors.New("manifest 必须且只能声明 entry 或 gateway_page")
 	}
 	if m.Entry != "" && (!safeRootName(m.Entry) || path.Ext(m.Entry) != ".html") {
@@ -207,6 +233,9 @@ func (m *Manifest) validate(files []File) error {
 	}
 	if !iconFound {
 		return fmt.Errorf("manifest 的 icon %q 在安装包中不存在", m.Icon)
+	}
+	if m.Format == 2 {
+		return m.validateFormatTwo(files)
 	}
 	return nil
 }
@@ -273,7 +302,7 @@ func (p *Proxy) validate(index int, keys map[string]bool) error {
 	if p.MaxResponseBytes == 0 {
 		p.MaxResponseBytes = 256 << 10
 	}
-	if p.MaxResponseBytes < 1024 || p.MaxResponseBytes > MaxPackageSize {
+	if p.MaxResponseBytes < 1024 || p.MaxResponseBytes > maxProxyResponse {
 		return fmt.Errorf("代理 %q 的 max_response_bytes 必须在 1024-1048576 之间", p.Key)
 	}
 	return nil
