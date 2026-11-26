@@ -32,6 +32,8 @@
 | `method` | `args` | 说明 |
 | --- | --- | --- |
 | `platform` | `{ capability, action, payload }` | 调用平台能力，见第 2 节；`capability` 须在 `platform.uses` 中声明（扩展点自带的能力按 `platform.provides`） |
+| `backend` | `{ path, method?, headers?, body?, bodyEncoding? }` | 调用本应用在 `backend.routes` 声明的后端路由；`path` 须以 `/` 开头（可带查询串），`method` 为 `GET HEAD POST PUT PATCH DELETE`（默认 `GET`），`bodyEncoding` 为 `utf8`（默认）或 `base64`（上限 1 MB）。返回 `{ ok, status, headers, body, encoding }`（`encoding` 为 `text` 或 `base64`） |
+| `backendUpload` | `{ path, file, filename?, scope?, headers? }` | 经目标系统直传大文件到指定 `POST` 后端路由（`file` 为 `File` 或 `Blob`，上限 50 MB 且受应用文件配额约束；`scope` 为 `shared` / `public` / `account`）；目标系统落盘后将临时路径与摘要交给模块，返回结构同 `backend` |
 | `activity` | — | 用户正在操作页面，用于闲置锁屏计时；每秒最多一次 |
 | `closeWindow` | — | 关闭当前窗口 |
 

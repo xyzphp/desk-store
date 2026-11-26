@@ -64,6 +64,13 @@ func LoadApp(dir string) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("package/：%w", err)
 	}
+	if pkg.Manifest.Backend != nil {
+		if wasmFile, found := pkg.File(pkg.Manifest.Backend.Module); found {
+			if err := appspec.ValidateBackendWasm(wasmFile.Content, &pkg.Manifest); err != nil {
+				return nil, fmt.Errorf("package/%s：%w", pkg.Manifest.Backend.Module, err)
+			}
+		}
+	}
 	if name := filepath.Base(dir); pkg.Manifest.Slug != name {
 		return nil, fmt.Errorf("目录名 %q 必须与 manifest 的 slug %q 一致", name, pkg.Manifest.Slug)
 	}

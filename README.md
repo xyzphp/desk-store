@@ -23,7 +23,8 @@ An open-source app store for browser desktops. Apps are submitted as source code
 | 目录 | 内容 |
 | --- | --- |
 | `apps/` | 应用源码，一个应用一个目录 |
-| `pkg/appspec/` | 安装包格式、清单校验、权限摘要、签名与静态数据格式（Go） |
+| `pkg/appspec/` | 安装包格式、清单校验、Wasm ABI 1 静态校验、权限摘要、签名与静态数据格式（Go） |
+| `sdk/` | 后端开发 Go SDK（`sdk/appkit`）与零依赖本地测试运行器（`sdk/apphost`） |
 | `cmd/appcheck/` | 校验、打包、生成数据与签名的命令行工具 |
 | `internal/build/` | 从 `apps/` 生成商店静态数据 |
 | `web/` | 商店网站（React + [`@xyzos/desk-ui`](https://github.com/xyzphp/desk-ui)） |

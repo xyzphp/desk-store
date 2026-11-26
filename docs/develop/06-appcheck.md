@@ -14,7 +14,7 @@ go run ./cmd/appcheck <命令>
 | `build [-out dist/public]` | 生成商店静态数据 |
 | `sign` / `verify` / `keygen` | 签名相关，见[自建商店](../self-host/01-fork.md)；`sign -dev-key 文件` 用本地联调密钥签名（文件不存在时生成），不能用于发布 |
 
-应用带 `build.json`（格式 2 草案：`src/` 界面源码、`backend/` 后端源码）时，`check`、`pack`、`summary` 与 `build` 会先按 `build.json` 在临时目录中构建，再校验与打包，需要本机装有 Node 22 + pnpm 与 Go 1.26；本地工具链版本不一致时只提示，CI 中会失败。规则见 [应用包格式 2（草案）](../spec/01-package-v2.md#7-源码与构建)。
+应用带 `build.json`（格式 2 草案：`src/` 界面源码、`backend/` 后端源码）时，`check`、`pack`、`summary` 与 `build` 会先按 `build.json` 在临时目录中构建，再校验与打包，需要本机装有 Node 22 + pnpm 与 Go 1.26；本地工具链版本不一致时只提示，CI 中会失败。包含 Wasm 后端模块时，`check` 还会静态校验 `backend/app.wasm` 的 ABI 1 导出函数（`memory`、`_initialize`、`handle` 与可选 `migrate`）以及仅导入清单已声明能力的 `host.*` 宿主函数。规则见 [应用包格式 2（草案）](../spec/01-package-v2.md#7-源码与构建) 与 [后端模块开发](07-backend.md)。
 
 ## 确定性打包
 

@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS personal_pins (
+  task_id INTEGER PRIMARY KEY,
+  pinned_at INTEGER NOT NULL DEFAULT 0
+);

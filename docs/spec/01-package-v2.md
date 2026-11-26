@@ -143,7 +143,7 @@ apps/<slug>/
 ```
 
 - `ui.toolchain` 与 `backend.toolchain` 只能取商店登记的固定工具链；CI 在固定版本的容器中执行 `pnpm install --frozen-lockfile` 与 `pnpm run <command>`，把 `output` 复制到 `package/`。界面源码必须提交锁文件。
-- 后端用 `GOOS=wasip1 GOARCH=wasm go build -trimpath` 构建，构建参数由商店固定，应用不能自定义。
+- 后端用 `GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -trimpath` 构建为 WASI reactor 模块（导出 `_initialize`、`memory` 与 `handle` 等入口），构建参数由商店固定，应用不能自定义。
 - 构建必须可复现：同一提交重复构建得到相同的文件；CI 在 Pull Request 中构建两次比较摘要。
 - 构建产物不提交到仓库。目标系统可以直接复用托管的组件库（`@xyzos/desk-ui`）构建，界面工程把它标为外部依赖以减小体积，具体方式见目标系统的开发文档。
 

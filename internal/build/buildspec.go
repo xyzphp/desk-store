@@ -150,7 +150,7 @@ func stagePackage(dir string, spec *BuildSpec) (string, func(), error) {
 			return fail(err)
 		}
 		env := []string{"GOOS=wasip1", "GOARCH=wasm", "CGO_ENABLED=0", "GOFLAGS=-mod=readonly"}
-		if err := run(ctx, filepath.Join(dir, "backend"), env, "go", "build", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", target, "."); err != nil {
+		if err := run(ctx, filepath.Join(dir, "backend"), env, "go", "build", "-buildmode=c-shared", "-trimpath", "-buildvcs=false", "-ldflags=-buildid=", "-o", target, "."); err != nil {
 			return fail(fmt.Errorf("构建后端模块失败：%w", err))
 		}
 	}

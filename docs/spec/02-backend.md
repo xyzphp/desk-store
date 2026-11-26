@@ -42,21 +42,193 @@
 
 ## 3. 接口约定（ABI 1）
 
-- 模块导出 `handle`：输入一个请求（方法、路径、查询、请求头白名单、请求体、调用上下文），输出状态码、响应头白名单与响应体。SDK 把它封装为常见的路由写法。
-- **调用上下文**由目标系统填写，模块不能修改：入口（`window` / `standalone` / `public` / `tool` / `schedule` / `hook` / `lifecycle`）、调用者（账号编号、显示名称；匿名与系统调用时为空）、调用者在本应用内拥有的权限、语言。
-- 宿主能力（模块导入的函数），每一类都要求清单中有对应声明，导入未声明的能力时安装校验失败：
+### 3.1 模块形态与导出
 
-| 能力 | 需要的声明 | 说明 |
-| --- | --- | --- |
-| `db.*` | `storage.shared` / `public` / `account` | 在对应范围的数据库执行参数化 SQL、事务 |
-| `kv.*` | 同上 | 按键读写 JSON |
-| `/data` 文件 | 同上 | WASI 目录：`/data/shared`、`/data/public`、`/data/me`（当前调用者） |
-| `http.fetch` | `http.allow` | 由目标系统发出请求 |
-| `proxy.fetch` | 格式 1 的 `proxies` | 经已声明代理访问，凭据由目标系统注入 |
-| `api.call` | 格式 1 的 `gateway_api` | 以调用者身份调用目标系统接口；无调用者时不可用 |
-| `platform.*` | `platform.uses` | 平台能力，如 `notify`、`image.sanitize` |
-| `config.get` | `config` | 读取安装配置 |
-| `log` | 无 | 写入应用日志 |
+- 后端以 WASI preview 1 **reactor** 形态构建（Go 使用 `GOOS=wasip1 GOARCH=wasm go build -buildmode=c-shared -trimpath`）。
+- 必须导出：
+  - `_initialize() -> ()`：实例化后的初始化入口，每次请求执行一次。
+  - `memory`：线性内存。
+  - `handle() -> i32`：统一请求处理入口；读取请求信封、写入响应信封后返回 `0` 表示正常完成，非零视为内部错误。
+- 可选导出：
+  - `migrate() -> i32`：数据库迁移完成后执行的 `lifecycle` 数据转换钩子（见第 5.1 节）。
+
+### 3.2 请求与响应信封
+
+- 请求信封通过 `host.request_len` / `host.request_read` 以 UTF-8 JSON 读取，结构如下：
+
+```json
+{
+  "method": "POST",
+  "path": "/tasks/42",
+  "query": "status=open",
+  "headers": { "content-type": "application/json", "accept": "application/json" },
+  "body_b64": "eyJ0aXRsZSI6IkhlbGxvIn0=",
+  "context": {
+    "app_slug": "todo-collab",
+    "entry": "window",
+    "user": { "id": 12, "display_name": "Alice" },
+    "permissions": ["task.write"],
+    "locale": "zh-CN",
+    "route": "/tasks/*",
+    "visibility": "permission:task.write"
+  }
+}
+```
+
+- **调用上下文**由目标系统填写，模块不能修改：入口（`window` / `standalone` / `public` / `tool` / `schedule` / `hook` / `lifecycle`）、调用者（账号编号、显示名称；匿名与系统调用时为 `null`）、调用者在本应用内拥有的权限、语言、命中的路由模板与可见级别。
+- 请求头白名单（键统一小写）：`accept`、`accept-language`、`content-type`、`if-match`、`if-none-match`、`if-modified-since`、`x-request-id`（`hook` 入口另放行签名类请求头；会话 Cookie、认证与 CSRF 头绝不透传）。
+- 响应信封通过 `host.response_write` 写入 UTF-8 JSON（编码后上限随响应体 1 MB 限制，重复调用以最后一次为准）：
+
+```json
+{
+  "status": 200,
+  "headers": { "content-type": "application/json; charset=utf-8" },
+  "body_b64": "eyJvayI6dHJ1ZX0=",
+  "send_file": ""
+}
+```
+
+- 响应头白名单（键统一小写）：`content-type`、`cache-control`、`etag`、`last-modified`、`vary`、`content-disposition` 与 `x-app-*` 前缀自定义头；禁止设置 `set-cookie`、`content-security-policy`、`location`、`access-control-*` 等安全相关响应头。`send_file` 为可选的 `/data/...` 路径，供目标系统直传下载。
+
+### 3.3 宿主函数（模块名 `host`）
+
+模块只允许从 `wasi_snapshot_preview1` 与 `host` 两个模块导入函数；导入未在清单声明的能力时安装校验拒绝。宿主函数采用“宿主结果缓冲区”约定，无需模块导出内存分配器：返回值 `>= 0` 表示成功且为待读结果载荷的字节数（0 表示空载荷）；返回值 `< 0` 表示失败（`-1` 通用错误、`-2` 未声明或无权限、`-3` 参数无效、`-4` 不存在、`-5` 超过限制或配额、`-6` 超时或已取消），错误说明存入同一缓冲区。调用方通过 `host.result_read(0, 0)` 查询当前缓冲区字节长度，再调用 `host.result_read(ptr, len)` 拷贝内容。
+
+| 导入函数（`host.*`） | 签名 | 需要的清单声明 | 说明 |
+| --- | --- | --- | --- |
+| `request_len` | `() -> u32` | 无（核心） | 返回当前请求信封 JSON 的字节长度 |
+| `request_read` | `(ptr u32, len u32) -> i32` | 无（核心） | 将请求信封复制到 guest 内存，返回写入字节数 |
+| `response_write` | `(ptr u32, len u32) -> i32` | 无（核心） | 写入响应信封 JSON，成功返回 `0` |
+| `result_read` | `(ptr u32, len u32) -> i32` | 无（核心） | `len == 0` 时返回当前结果/错误缓冲区长度，否则拷贝到 guest 内存 |
+| `log` | `(level u32, ptr u32, len u32) -> i32` | 无 | 写入应用日志（`0` debug / `1` info / `2` warn / `3` error；单条 ≤ 4 KB，单次请求 ≤ 64 条） |
+| `config_get` | `(key_ptr u32, key_len u32) -> i32` | `backend.config` | 按键读取安装配置值，不存在返回 `-4`，未声明返回 `-2` |
+| `db_call` | `(ptr u32, len u32) -> i32` | `backend.storage` 任一范围 | 执行参数化 SQL 或事务（JSON 请求 / 响应） |
+| `kv_call` | `(ptr u32, len u32) -> i32` | `backend.storage` 任一范围 | 按键读写 JSON 集合 |
+| `http_fetch` | `(ptr u32, len u32) -> i32` | `backend.http.allow` | 经目标系统发出外部 HTTP 请求 |
+| `proxy_fetch` | `(ptr u32, len u32) -> i32` | 格式 1 的 `proxies` | 经已声明代理访问，凭据由目标系统注入 |
+| `api_call` | `(ptr u32, len u32) -> i32` | 格式 1 的 `gateway_api` | 以调用者身份调用目标系统接口；无调用者时不可用 |
+| `platform_call` | `(ptr u32, len u32) -> i32` | `platform.uses` 或 `provides.settings` | 调用平台能力（如 `settings.get`、`notify`、`image.sanitize`） |
+
+除上述函数外，`/data` 文件读写经标准 WASI preview 1 文件接口提供（`/data/shared`、`/data/public`、`/data/me`），目标系统禁用符号链接与硬链接并在写入时强制配额。
+
+### 3.4 `db_call` 与 `kv_call` 载荷协议
+
+- **`host.db_call(ptr, len) -> i32`**（请求体 ≤ 1 MB，UTF-8 JSON）：
+
+```json
+{
+  "scope": "shared",
+  "op": "query",
+  "tx": "",
+  "sql": "SELECT id, title FROM tasks WHERE status = ?",
+  "args": ["open"]
+}
+```
+
+  - `scope` 为 `shared`、`public` 或 `account`，须在 `backend.storage` 中声明；`public` 路由与 `public` 入口仅允许访问 `public` 且为只读；`account` 仅允许已认证调用者访问本人独立库。
+  - `op` 支持：
+    - `query`：执行参数化单条查询（或写连接上的 `... RETURNING`），返回 `{ "columns": [...], "rows": [[...]] }`（响应 JSON ≤ 1 MB，超出返回 `-5`）。二进制参数与结果以 `{ "$blob_b64": "<base64>" }` 表示。
+    - `exec`：执行参数化单条写语句（`INSERT` / `UPDATE` / `DELETE` / `REPLACE` / `WITH`），返回 `{ "rows_affected": 1, "last_insert_id": 42 }`。
+    - `begin`：在指定 `scope` 上开启本次请求内的事务，返回 `{ "tx": "<id>" }`；单次请求最多同时开启 4 个事务，请求结束时未提交的事务自动回滚。
+    - `commit` / `rollback`：提交或回滚 `tx`，返回 `{}`。
+  - 语句限制：每次只允许严格单条语句；运行时禁止 `ATTACH`、`DETACH`、`VACUUM`、`PRAGMA`、DDL、原始事务控制语句及访问保留表 `_app_migrations` / `_app_kv`、`pragma_*`、`load_extension` 与内部虚拟表；表结构变更只通过第 5 节的迁移文件完成。
+
+- **`host.kv_call(ptr, len) -> i32`**（请求体 ≤ 512 KB，UTF-8 JSON）：
+
+```json
+{ "scope": "shared", "op": "get", "key": "board.order", "value": null, "prefix": "", "limit": 100 }
+```
+
+  - `scope` 权限与只读规则同 `db_call`。`key` 为 1–128 字节有效 UTF-8（无控制字符），`value` 为任意 JSON 值（序列化后 ≤ 256 KB）。
+  - `op` 支持 `get`（返回 `{ "found": bool, "value"?, "updated_at"? }`）、`set`（返回 `{ "ok": true, "updated_at": ms }`）、`delete`（返回 `{ "deleted": bool }`）、`list`（按 `prefix` 前缀列出最多 `limit` 条，默认 100、上限 500，返回 `{ "items": [{ "key", "value", "updated_at" }], "has_more": bool }`）。
+
+### 3.5 `http_fetch`、`proxy_fetch`、`api_call` 与 `platform_call` 载荷协议
+
+所有调用的请求 JSON 与响应载荷均受 1 MB 上限约束（超出返回 `-5`）。
+
+- **`host.http_fetch(ptr, len) -> i32`**（需要 `backend.http.allow`）：
+
+```json
+{
+  "method": "GET",
+  "url": "https://api.example.com/v1/items?page=1",
+  "headers": { "accept": "application/json" },
+  "body_b64": "",
+  "timeout_ms": 5000
+}
+```
+
+  - `url` 仅允许 `http` / `https`，禁止携带账号信息；目标主机（小写域名及可选端口）与方法必须命中 `backend.http.allow`，且解析后的地址须通过目标系统的地址安全策略（非本地模式拒绝回环、链路本地、多播与保留地址）。
+  - 重定向最多跟随 3 次，每一跳目标主机与方法都必须同样在 `backend.http.allow` 内并通过地址策略，跨主机跳转时清除敏感请求头；越界返回 `-2`。
+  - 成功返回：`{ "status": 200, "headers": { "content-type": "application/json" }, "body_b64": "<base64>" }`。
+
+- **`host.proxy_fetch(ptr, len) -> i32`**（需要清单声明 `proxies`）：
+
+```json
+{
+  "proxy": "upstream",
+  "method": "GET",
+  "path": "/v1/status",
+  "query": "full=1",
+  "headers": { "accept": "application/json" },
+  "body_b64": ""
+}
+```
+
+  - `proxy` 须命中清单声明的代理键，方法、路径与 `query` 受代理白名单和 `pass_query` 约束；代理凭据由目标系统在服务端注入，不向模块暴露；不跟随重定向。
+  - 成功返回：`{ "status": 200, "headers": { "content-type": "application/json" }, "body_b64": "<base64>" }`。
+
+- **`host.api_call(ptr, len) -> i32`**（需要清单声明 `gateway_api`，且当前请求存在已认证浏览器调用者；`public` / `hook` / `schedule` / `lifecycle` 等无调用者入口一律返回 `-2`）：
+
+```json
+{
+  "method": "GET",
+  "path": "/xyzos/api/bookmarks",
+  "query": "limit=20",
+  "headers": { "accept": "application/json" },
+  "body_b64": ""
+}
+```
+
+  - `path` 须命中 `gateway_api` 前缀白名单，且禁止访问会话、令牌、账号、角色、实时通道、安全设置、自定义应用管理、模型与通知设置等受限系统端点；实际请求严格以当前调用者的会话身份执行，不会提权。
+  - 成功返回：`{ "status": 200, "headers": { "content-type": "application/json" }, "body_b64": "<base64>" }`。
+
+- **`host.platform_call(ptr, len) -> i32`**（需要 `platform.uses` 或 `platform.provides.settings`）：
+
+```json
+{ "action": "settings.get", "params": {} }
+```
+
+  - 支持的 `action`：
+    - `settings.get`（需要 `platform.provides.settings`）：返回 `{ "values": { ... }, "updated_at": 1700000000000 }`。
+    - `identity.me`（需要 `platform.uses` 含 `identity` 且存在调用者）：返回 `{ "id": 12, "display_name": "Alice", "avatar_url": "..." }`。
+    - `notify.send`（需要 `platform.uses` 含 `notify`）：`params` 为 `{ "title": "...", "body": "...", "user_id": 12 }`；存在调用者时 `user_id` 可省（默认为调用者本人），无调用者时必填；目标账号必须处于正常状态且已获授该应用，返回 `{ "ok": true }`。
+
+### 3.6 公开回调（`hooks`）、定时任务（`schedules`）与迁移钩子（`migrate`）
+
+- **公开回调**：外部服务请求 `{站点根}/custom/<slug>/hooks/<name>`（无需会话，受每应用/IP 限频与 1 MB 请求体上限约束）。请求信封的 `path` 为 `/hooks/<name>`、`context.entry` 为 `"hook"`、`context.user` 为 `null`、`context.route` 为 `/hooks/<name>`；除标准请求头白名单外，额外放行常见签名与回调头（`user-agent`、`x-timestamp`、`stripe-signature`、`svix-*`、`x-signature*`、`x-hub-signature*`、`x-webhook-*`、`x-github-*`、`x-gitlab-*`）。模块应通过 `config_get` 读取密钥自行验签；可读写 `shared` / `public` 存储，不可访问 `account` 存储与 `api_call`。
+- **定时任务**：目标系统按标准五段 cron（最小间隔 5 分钟）触发对应 `POST` 路由。请求信封的 `method` 为 `"POST"`、`path` 为 `schedule.route`、`body_b64` 为 `{"schedule":"<name>","triggered_at":<unix_ms>}` 的 Base64、`context.entry` 为 `"schedule"`、`context.user` 为 `null`。可读写 `shared` / `public` 存储与调用外联/平台能力，不可访问 `account` 存储与 `api_call`。
+- **迁移钩子（`migrate`）**：更新或安装执行完 SQL 迁移后，如模块导出了 `migrate() -> i32`，目标系统以 `method: "POST"`、`path: "/lifecycle/migrate"`、`body_b64: base64({"from_version":"...","to_version":"..."})`、`context.entry: "lifecycle"`、`context.user: null` 调用一次。返回 `0` 表示成功（无需调用 `response_write`），非零则中止安装或更新并回滚恢复备份。
+
+### 3.7 文件直传（上传与 `send_file` 下载）
+
+- **大文件上传**：目标系统将前端直传的文件校验大小与配额后直接写入对应范围的临时目录 `/data/<scope>/.uploads/<id>`，再以 `POST` 调用目标路由，请求体为 UTF-8 JSON：
+
+```json
+{
+  "upload": {
+    "path": "/data/shared/.uploads/<id>",
+    "scope": "shared",
+    "filename": "report.pdf",
+    "media_type": "application/pdf",
+    "size": 123456,
+    "sha256": "<hex>"
+  }
+}
+```
+
+  模块可经标准 `/data` 文件接口校验或重命名该文件到最终位置；若模块执行失败或返回 `status >= 400` 且临时文件仍在原处，目标系统自动删除并退回配额。
+- **大文件下载（`send_file`）**：模块在响应信封中设置 `send_file` 为 `/data/shared/...`、`/data/public/...` 或 `/data/me/...`（不设 `body_b64`），目标系统校验范围、路径与符号链接后直接流式输出文件内容（不受 1 MB 响应体限制），自动附加 `X-Content-Type-Options: nosniff` 与安全 `Content-Disposition`。
 
 ## 4. 存储
 
