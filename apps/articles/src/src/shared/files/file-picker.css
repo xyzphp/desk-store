@@ -1,0 +1,116 @@
+/* 统一的“选择文件”窗口：版式沿用原站 file-image-picker（工具栏 + 缩略图卡片网格）；控件外观来自 @xyzos/desk-ui。 */
+@layer ds {
+  .desk-file-picker-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 16px;
+    background: var(--bg-win);
+  }
+  .desk-file-picker-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+  .desk-file-picker-search {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+  .desk-file-picker-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .desk-file-picker-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(126px, 100%), 1fr));
+    gap: 12px;
+    flex: 1;
+    align-content: start;
+    min-height: 0;
+    padding: 2px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .desk-file-picker-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .desk-file-picker-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: calc(10px * var(--ds-radius-scale));
+    background: var(--bg-win);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
+  }
+  .desk-file-picker-item:hover:not(:disabled) {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+  .desk-file-picker-item:focus-visible {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: -2px;
+  }
+  .desk-file-picker-item:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+  .desk-file-picker-thumb {
+    display: grid;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    place-items: center;
+    overflow: hidden;
+    background: var(--hover);
+    color: var(--accent);
+  }
+  .desk-file-picker-thumb > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .desk-file-picker-thumb > .ds-icon {
+    width: 42px;
+    height: 42px;
+  }
+  .desk-file-picker-caption {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px;
+  }
+  .desk-file-picker-caption > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .desk-file-picker-caption > small,
+  .desk-file-picker-hint {
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .desk-file-picker-hint {
+    flex: none;
+    margin: 0;
+  }
+}

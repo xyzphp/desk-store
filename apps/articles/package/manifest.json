@@ -1,0 +1,351 @@
+{
+  "format": 2,
+  "slug": "articles",
+  "name": "文章",
+  "version": "1.0.0",
+  "description": "文章写作与公开阅读：支持三级分类与标签、封面裁剪、Markdown 可视化编辑、AI 辅助、站点配置与每日一言。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "window": {
+    "width": 1400,
+    "height": 820,
+    "min_width": 1400,
+    "min_height": 640
+  },
+  "requires": { "platform": 1 },
+  "access": {
+    "permissions": [
+      { "name": "site.settings", "title": "站点设置" }
+    ],
+    "default_grant": "none"
+  },
+  "surfaces": {
+    "home": "/",
+    "window": {
+      "pages": [
+        { "path": "/", "visibility": "app" }
+      ]
+    },
+    "standalone": { "enabled": true },
+    "public": {
+      "pages": [
+        { "path": "/", "visibility": "public" }
+      ],
+      "alias": "/articles",
+      "session": "optional"
+    }
+  },
+  "platform": {
+    "uses": [
+      "identity",
+      "ui",
+      "workspace.state",
+      "files.pick",
+      "files.save",
+      "files.reference",
+      "image.sanitize",
+      "ai.complete",
+      "ai.image"
+    ],
+    "provides": {
+      "builtin_import": {
+        "sources": ["articles.site"],
+        "route": "/import/builtin"
+      },
+      "settings": {
+        "fields": [
+          {
+            "key": "ai_enabled",
+            "type": "boolean",
+            "title": "启用 AI 写作助手",
+            "description": "开启编辑区悬浮选区优化与表单智能补全",
+            "default": true
+          },
+          {
+            "key": "ai_image_enabled",
+            "type": "boolean",
+            "title": "启用 AI 封面与正文生图",
+            "description": "开启封面与正文插图生图入口（仍受系统生图开关与每日限额控制）",
+            "default": true
+          },
+          {
+            "key": "ai_translate_languages",
+            "type": "text",
+            "title": "翻译目标语言",
+            "description": "用逗号分隔的可选翻译语言，首项为默认语言",
+            "maxLength": 400,
+            "default": "简体中文, English, 日本語"
+          },
+          {
+            "key": "ai_prompt_polish",
+            "type": "textarea",
+            "title": "润色提示词",
+            "description": "支持变量 {{content}}、{{context}}",
+            "default": "润色 {{content}}，使表达清晰自然，保留事实、格式与原意。参考 {{context}}。只返回处理后的内容。"
+          },
+          {
+            "key": "ai_prompt_expand",
+            "type": "textarea",
+            "title": "扩写提示词",
+            "description": "支持变量 {{content}}、{{context}}",
+            "default": "根据 {{context}} 扩写 {{content}}，补充结构与解释，不编造事实。只返回处理后的内容。"
+          },
+          {
+            "key": "ai_prompt_shorten",
+            "type": "textarea",
+            "title": "精简提示词",
+            "description": "支持变量 {{content}}、{{context}}",
+            "default": "精简 {{content}}，保留关键信息与格式。参考 {{context}}。只返回处理后的内容。"
+          },
+          {
+            "key": "ai_prompt_translate",
+            "type": "textarea",
+            "title": "翻译提示词",
+            "description": "支持变量 {{content}}、{{targetLanguage}}、{{context}}",
+            "default": "将 {{content}} 翻译成 {{targetLanguage}}，保留事实、格式与引用。参考 {{context}}。只返回译文。"
+          },
+          {
+            "key": "ai_prompt_custom",
+            "type": "textarea",
+            "title": "自定义优化提示词",
+            "description": "支持变量 {{instruction}}、{{content}}、{{context}}",
+            "default": "根据 {{instruction}} 处理 {{content}}。参考 {{context}}，保留事实与引用。只返回处理后的内容。"
+          },
+          {
+            "key": "ai_prompt_form",
+            "type": "textarea",
+            "title": "表单智能补全提示词",
+            "description": "支持变量 {{formContext}}、{{existingFields}}、{{requestedFields}}、{{instruction}}",
+            "default": "根据 {{formContext}} 和 {{existingFields}}，补全 {{requestedFields}}。遵循 {{instruction}}，不编造事实，按要求的 JSON 字段返回。"
+          },
+          {
+            "key": "ai_image_style",
+            "type": "textarea",
+            "title": "生图风格提示词",
+            "description": "可选，生成文章封面或正文插图时附加的视觉风格说明",
+            "default": ""
+          }
+        ]
+      }
+    }
+  },
+  "backend": {
+    "runtime": "wasm",
+    "abi": 1,
+    "module": "backend/app.wasm",
+    "limits": {
+      "timeout_ms": 20000,
+      "memory_mb": 128
+    },
+    "storage": {
+      "shared": true,
+      "public": true,
+      "database_mb": 200,
+      "files_mb": 256
+    },
+    "http": {
+      "allow": [
+        { "host": "v1.hitokoto.cn", "methods": ["GET"] },
+        { "host": "60s.viki.moe", "methods": ["GET"] }
+      ]
+    },
+    "schedules": [
+      { "name": "daily-quote", "cron": "*/15 * * * *", "route": "/jobs/daily-quote" }
+    ],
+    "token_scopes": [
+      { "id": "read", "label": "读取", "description": "读取本人文章、草稿、回收站、分类标签与引用文件" },
+      { "id": "write", "label": "新增与修改", "description": "保存本人文章草稿、分类标签、恢复文章或上传文件" },
+      { "id": "publish", "label": "发布与撤回", "description": "发布、更新发布或撤回本人的文章，发布可能公开内容" },
+      { "id": "delete", "label": "删除", "description": "将本人文章移入回收站、永久删除文章或删除分类标签" }
+    ],
+    "routes": [
+      { "path": "/articles", "methods": ["GET"], "visibility": "app", "token_scope": "read" },
+      { "path": "/articles", "methods": ["POST"], "visibility": "app", "token_scope": "write" },
+      { "path": "/articles/*", "methods": ["GET", "HEAD"], "visibility": "app", "token_scope": "read" },
+      { "path": "/articles/*", "methods": ["PUT"], "visibility": "app", "token_scope": "write" },
+      { "path": "/articles/*", "methods": ["POST"], "visibility": "app", "token_scope": "delete" },
+      { "path": "/publish/*", "methods": ["POST"], "visibility": "app", "token_scope": "publish" },
+      { "path": "/restore/*", "methods": ["POST"], "visibility": "app", "token_scope": "write" },
+      { "path": "/taxonomies", "methods": ["POST"], "visibility": "app", "token_scope": "write" },
+      { "path": "/taxonomies/*", "methods": ["DELETE"], "visibility": "app", "token_scope": "delete" },
+      { "path": "/files", "methods": ["GET"], "visibility": "app", "token_scope": "read" },
+      { "path": "/files/register", "methods": ["POST"], "visibility": "app" },
+      { "path": "/files/upload", "methods": ["POST"], "visibility": "app", "token_scope": "write" },
+      { "path": "/files/content/*", "methods": ["GET", "HEAD"], "visibility": "app", "token_scope": "read" },
+      { "path": "/site", "methods": ["GET", "PUT"], "visibility": "permission:site.settings" },
+      { "path": "/site/quotes", "methods": ["GET", "POST"], "visibility": "permission:site.settings" },
+      { "path": "/import/builtin", "methods": ["POST"], "visibility": "permission:site.settings" },
+      { "path": "/jobs/daily-quote", "methods": ["POST"], "visibility": "app" },
+      { "path": "/tools/*", "methods": ["POST"], "visibility": "app" },
+      { "path": "/resources/*", "methods": ["POST"], "visibility": "app" },
+      { "path": "/public/articles", "methods": ["GET"], "visibility": "public", "rate_limit": "120/min" },
+      { "path": "/public/articles/*", "methods": ["GET", "HEAD"], "visibility": "public", "rate_limit": "120/min" },
+      { "path": "/public/site", "methods": ["GET"], "visibility": "public", "rate_limit": "120/min" },
+      { "path": "/public/site/*", "methods": ["GET", "HEAD"], "visibility": "public", "rate_limit": "120/min" },
+      { "path": "/public/ssr", "methods": ["GET", "HEAD"], "visibility": "public", "rate_limit": "120/min" },
+      { "path": "/public/ssr/*", "methods": ["GET", "HEAD"], "visibility": "public", "rate_limit": "120/min" },
+      { "path": "/public/rss.xml", "methods": ["GET", "HEAD"], "visibility": "public", "rate_limit": "60/min" },
+      { "path": "/public/sitemap.xml", "methods": ["GET", "HEAD"], "visibility": "public", "rate_limit": "60/min" }
+    ]
+  },
+  "mcp": {
+    "tools": [
+      {
+        "name": "list_articles",
+        "title": "列出文章",
+        "description": "读取本人文章概要、分类和标签",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "annotations": { "read_only": true },
+        "call": { "backend": "/tools/list-articles" }
+      },
+      {
+        "name": "get_article",
+        "title": "读取文章详情",
+        "description": "读取本人的文章、草稿与引用文件元信息",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "minimum": 1, "description": "文章编号" }
+          },
+          "required": ["id"]
+        },
+        "annotations": { "read_only": true },
+        "call": { "backend": "/tools/get-article" }
+      },
+      {
+        "name": "create_article",
+        "title": "新建文章",
+        "description": "创建本人文章草稿或发布新文章；未明确要求发布时请使用 action=save",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "action": { "type": "string", "enum": ["save", "publish"], "description": "save 保存草稿，publish 发布文章" },
+            "draft": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string", "maxLength": 160, "description": "文章标题，发布时必填" },
+                "summary": { "type": "string", "maxLength": 500, "description": "文章摘要" },
+                "content": { "type": "string", "maxLength": 80000, "description": "Markdown 正文" },
+                "categoryId": { "type": "integer", "minimum": 0, "description": "分类编号，0 表示未分类" },
+                "coverFileId": { "type": "integer", "minimum": 0, "description": "封面文件编号，0 表示无封面" },
+                "coverWidth": { "type": "integer", "minimum": 0, "description": "封面宽度" },
+                "coverHeight": { "type": "integer", "minimum": 0, "description": "封面高度" },
+                "tagIds": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "标签编号列表（最多 12 个）" },
+                "fileIds": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "引用文件编号列表（最多 32 个）" },
+                "visibility": { "type": "string", "enum": ["private", "public"], "description": "发布可见范围" }
+              },
+              "required": ["title", "summary", "content", "categoryId", "coverFileId", "tagIds", "fileIds", "visibility"]
+            }
+          },
+          "required": ["action", "draft"]
+        },
+        "call": { "backend": "/tools/create-article" }
+      },
+      {
+        "name": "save_article",
+        "title": "保存或发布文章",
+        "description": "按 revision 保存本人文章草稿或更新发布快照",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "minimum": 1, "description": "文章编号" },
+            "revision": { "type": "integer", "minimum": 1, "description": "当前修订号" },
+            "action": { "type": "string", "enum": ["save", "publish"], "description": "save 保存草稿，publish 更新发布" },
+            "draft": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string", "maxLength": 160, "description": "文章标题" },
+                "summary": { "type": "string", "maxLength": 500, "description": "文章摘要" },
+                "content": { "type": "string", "maxLength": 80000, "description": "Markdown 正文" },
+                "categoryId": { "type": "integer", "minimum": 0, "description": "分类编号" },
+                "coverFileId": { "type": "integer", "minimum": 0, "description": "封面文件编号" },
+                "coverWidth": { "type": "integer", "minimum": 0, "description": "封面宽度" },
+                "coverHeight": { "type": "integer", "minimum": 0, "description": "封面高度" },
+                "tagIds": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "标签编号列表" },
+                "fileIds": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "description": "引用文件编号列表" },
+                "visibility": { "type": "string", "enum": ["private", "public"], "description": "发布可见范围" }
+              },
+              "required": ["title", "summary", "content", "categoryId", "coverFileId", "tagIds", "fileIds", "visibility"]
+            }
+          },
+          "required": ["id", "revision", "action", "draft"]
+        },
+        "call": { "backend": "/tools/save-article" }
+      },
+      {
+        "name": "article_action",
+        "title": "文章状态操作",
+        "description": "按 revision 撤回发布、移入回收站、恢复或永久删除回收站中的文章",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "minimum": 1, "description": "文章编号" },
+            "revision": { "type": "integer", "minimum": 1, "description": "当前修订号" },
+            "action": { "type": "string", "enum": ["unpublish", "trash", "restore", "delete"], "description": "操作类型" }
+          },
+          "required": ["id", "revision", "action"]
+        },
+        "annotations": { "destructive": true },
+        "call": { "backend": "/tools/article-action" }
+      },
+      {
+        "name": "save_article_taxonomy",
+        "title": "维护分类与标签",
+        "description": "新增、重命名、调整层级或删除本人分类与标签",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "integer", "minimum": 0, "description": "0 表示新建，否则为已有编号" },
+            "revision": { "type": "integer", "minimum": 0, "description": "新建为 0，修改或删除传当前修订号" },
+            "kind": { "type": "string", "enum": ["category", "tag"], "description": "分类或标签" },
+            "name": { "type": "string", "maxLength": 40, "description": "名称" },
+            "parentId": { "type": "integer", "minimum": 0, "description": "上级分类编号，标签必须为 0" },
+            "action": { "type": "string", "enum": ["save", "delete"], "description": "保存或删除" }
+          },
+          "required": ["id", "revision", "kind", "action"]
+        },
+        "annotations": { "destructive": true },
+        "call": { "backend": "/tools/save-article-taxonomy" }
+      },
+      {
+        "name": "list_article_files",
+        "title": "列出文章已引用文件",
+        "description": "读取本人已在本应用中登记的文章文件元信息",
+        "input_schema": {
+          "type": "object",
+          "properties": {}
+        },
+        "annotations": { "read_only": true },
+        "call": { "backend": "/tools/list-article-files" }
+      }
+    ],
+    "resources": [
+      {
+        "uri": "articles://recent",
+        "title": "最近更新的文章",
+        "call": { "backend": "/resources/recent" }
+      },
+      {
+        "uri": "articles://taxonomies",
+        "title": "分类与标签目录",
+        "call": { "backend": "/resources/taxonomies" }
+      }
+    ],
+    "prompts": [
+      {
+        "name": "article_outline",
+        "title": "生成文章大纲",
+        "file": "mcp/prompts/article-outline.md"
+      },
+      {
+        "name": "article_polish",
+        "title": "润色文章草稿",
+        "file": "mcp/prompts/article-polish.md"
+      }
+    ]
+  },
+  "skills": ["article-writing"]
+}

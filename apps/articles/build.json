@@ -1,0 +1,4 @@
+{
+  "ui": { "toolchain": "node@22", "command": "build", "output": "dist" },
+  "backend": { "toolchain": "go@1.26", "abi": 1 }
+}

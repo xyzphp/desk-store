@@ -1,0 +1,407 @@
+.md-editor-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 0;
+  border-block: 1px solid var(--border);
+  overflow-x: auto;
+}
+.md-editor-toolbar > .md-editor-modes,
+.md-editor-toolbar > .md-editor-tools {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  overflow: visible;
+}
+.md-editor-toolbar-wrap {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+.md-editor-toolbar-wrap > .md-editor-tools {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.md-editor-toolbar::-webkit-scrollbar {
+  height: 6px;
+}
+.md-editor-toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.md-editor-toolbar::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--text) 23%, transparent);
+  background-clip: padding-box;
+}
+.md-editor-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+.md-editor-tool-group {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+.md-editor-tool-group:first-child {
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+}
+.md-editor-tools button:not(:is(.desk-form-ai-layer, .ai-assist-popover) *) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 5px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.md-editor-tools button:hover:not(:disabled):not(:is(.desk-form-ai-layer, .ai-assist-popover) *) {
+  color: var(--text);
+  background: var(--hover);
+}
+.md-editor-tools button:disabled:not(:is(.desk-form-ai-layer, .ai-assist-popover) *) {
+  opacity: 0.45;
+  cursor: default;
+}
+.md-editor-tools .xyz-icon:not(:is(.desk-form-ai-layer, .ai-assist-popover) *) {
+  width: 15px;
+  height: 15px;
+}
+.md-editor-tools button:has(span):not(:is(.desk-form-ai-layer, .ai-assist-popover) *) {
+  padding: 5px 8px;
+}
+.md-editor-modes {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--hover);
+}
+.md-editor-modes button {
+  min-height: 27px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.md-editor-modes button[aria-pressed='true'] {
+  background: var(--bg-panel);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ds-shade) 8%, transparent);
+}
+.md-editor-tools button:focus-visible:not(:is(.desk-form-ai-layer, .ai-assist-popover) *),
+.md-editor-modes button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--text) 28%, transparent);
+  outline-offset: -2px;
+}
+.md-editor-writing img {
+  max-width: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.md-editor-writing [contenteditable='true'][role='textbox'] {
+  cursor: text;
+  outline: 0;
+}
+.md-editor-writing [contenteditable='true'][role='textbox']:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-2);
+  pointer-events: none;
+}
+.md-editor-writing .markdown-image {
+  border-radius: 8px;
+  cursor: default;
+}
+.md-editor-writing .markdown-image.is-selected {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.md-editor-writing .markdown-image:focus-visible {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 3px;
+}
+.md-editor-image-resize {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: none;
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid var(--bg-panel);
+  border-radius: 4px;
+  background: var(--accent);
+  box-shadow: 0 1px 4px #0003;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.markdown-image:is(.is-selected, :focus-within) > .md-editor-image-resize {
+  display: block;
+}
+.md-editor-writing.is-resizing-image {
+  cursor: ew-resize;
+  user-select: none;
+}
+.md-editor-image-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-panel);
+  color: var(--text-2);
+  font-size: 12px;
+}
+.md-editor-image-settings strong {
+  color: var(--text);
+  font-size: 12px;
+}
+.md-editor-image-settings label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.md-editor-image-settings :is(input, select, button) {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-win);
+  color: var(--text);
+  font: inherit;
+}
+.md-editor-image-settings input {
+  width: 78px;
+}
+.md-editor-image-settings button {
+  cursor: pointer;
+}
+.md-editor-image-settings button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.md-editor-image-settings [data-md-image-close] {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  margin-left: auto;
+  padding: 5px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+}
+.md-editor-image-settings .xyz-icon {
+  width: 15px;
+  height: 15px;
+}
+.md-editor-image-settings[hidden] {
+  display: none !important;
+}
+.md-editor-image-settings :disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.md-editor-empty {
+  color: var(--text-2);
+  font-size: 13px;
+}
+.md-editor-files {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-win);
+  font-size: 12px;
+}
+.md-editor-file-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.md-editor-files button {
+  font: inherit;
+  cursor: pointer;
+}
+.md-editor-file-head > button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 5px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-2);
+  background: transparent;
+}
+.md-editor-file-head > button:hover {
+  background: var(--hover);
+}
+.md-editor-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.md-editor-file-upload {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  cursor: pointer;
+}
+.md-editor-file-upload input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.md-editor-file-upload:focus-within {
+  outline: 2px solid var(--focus-outline);
+  outline-offset: 2px;
+}
+.md-editor-file-actions :is(select, input[type='search']) {
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: 12px;
+}
+.md-editor-file-actions input[type='search'] {
+  flex: 1 1 140px;
+}
+.md-editor-file-actions select {
+  max-width: 180px;
+}
+.md-editor-file-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+  max-height: 240px;
+  margin-top: 10px;
+  overflow: auto;
+}
+.md-editor-file-list > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+}
+.md-editor-file-list > button:hover {
+  background: var(--bg-panel);
+  border-color: var(--border);
+}
+.md-editor-file-list :is(img, .md-editor-file-icon) {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--hover);
+}
+.md-editor-file-list > button > span:not(.md-editor-file-icon) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-editor-file-list small {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.md-editor-file-list > p {
+  padding: 18px 6px;
+  color: var(--text-2);
+}
+.md-editor-attachments {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0;
+}
+.md-editor-attachments > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 5px 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+}
+.md-editor-attachments > div > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.md-editor-attachments a {
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  text-decoration: none;
+}
+.md-editor-attachments button {
+  padding: 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.md-editor-attachments button:hover {
+  background: var(--hover);
+}
+.md-editor-files .xyz-icon,
+.md-editor-attachments .xyz-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+.md-editor-files [hidden],
+.md-editor-attachments[hidden],
+.md-editor-tools[hidden] {
+  display: none !important;
+}

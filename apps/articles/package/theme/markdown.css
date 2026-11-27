@@ -1,0 +1,31 @@
+.xyz-markdown { color: var(--text); font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.xyz-markdown > :first-child { margin-top: 0; }
+.xyz-markdown > :last-child { margin-bottom: 0; }
+.xyz-markdown h1, .xyz-markdown h2, .xyz-markdown h3, .xyz-markdown h4, .xyz-markdown h5, .xyz-markdown h6 { margin: 1.1em 0 .5em; line-height: 1.4; font-weight: 700; }
+.xyz-markdown h1 { font-size: 24px; }
+.xyz-markdown h2 { font-size: 21px; }
+.xyz-markdown h3 { font-size: 18px; }
+.xyz-markdown h4, .xyz-markdown h5, .xyz-markdown h6 { font-size: 15px; }
+.xyz-markdown p, .xyz-markdown ul, .xyz-markdown ol { margin: .7em 0; }
+.xyz-markdown ul, .xyz-markdown ol { padding-left: 24px; }
+.xyz-markdown li + li { margin-top: 4px; }
+.xyz-markdown a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.xyz-markdown code { padding: 2px 5px; border-radius: 5px; background: var(--hover); font: 13px/1.6 Consolas, monospace; }
+.xyz-markdown pre { max-width: 100%; overflow: auto; padding: 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg-panel); }
+.xyz-markdown pre code { padding: 0; background: transparent; white-space: pre; }
+.xyz-markdown blockquote { margin: 12px 0; padding: 3px 12px; border-left: 3px solid var(--accent); background: var(--hover); color: var(--text-2); }
+.xyz-markdown hr { margin: 18px 0; border: 0; border-top: 1px solid var(--border); }
+.xyz-markdown .markdown-table { max-width: 100%; overflow: auto; }
+.xyz-markdown table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.xyz-markdown th, .xyz-markdown td { padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
+.xyz-markdown th { background: var(--hover); font-weight: 650; }
+.xyz-markdown .markdown-task { list-style: none; }
+.xyz-markdown .markdown-task > span { margin-right: 8px; color: var(--accent); }
+
+/* Protected image layout is shared by the workspace and the article reader. */
+:is(.xyz-markdown, .reader-content) .markdown-image { position: relative; display: block; width: fit-content; max-width: 100%; margin: 10px 0; line-height: 0; text-indent: 0; }
+:is(.xyz-markdown, .reader-content) .markdown-image > img { display: block; max-width: 100%; height: auto; margin: 0; border-radius: 8px; object-fit: contain; }
+:is(.xyz-markdown, .reader-content) .markdown-image-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; width: 100%; margin: 12px 0; text-indent: 0; }
+:is(.xyz-markdown, .reader-content) .markdown-image-row[data-md-columns="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:is(.xyz-markdown, .reader-content) .markdown-image-row[data-md-columns="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+:is(.xyz-markdown, .reader-content) .markdown-image-row > .markdown-image { min-width: 0; margin: 0; }

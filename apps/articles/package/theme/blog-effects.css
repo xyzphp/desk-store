@@ -1,0 +1,81 @@
+#banner {
+		padding: 20px 0;
+		color:#fff;
+		text-shadow: 0 0 4px #000;
+		/*background:url(../images/bg_01.jpg);*/
+		/*background:url(../images/bg_13.jpg);*/
+		/*background:url(../images/bg_04.jpg);*/
+		/*background:url(../images/bg_02.jpg);*/
+	}
+
+	footer {
+		color:#fff;
+		padding: 20px 0;
+		background:url(footer.png);
+		/*background:url(../images/footer_bg_02.png);*/
+	}
+
+	footer .list-unstyled li{padding-bottom: 4px;}
+	footer .list-unstyled i{font-size: 14px;margin-right: 14px;}
+	footer .friend-link{line-height: 30px;width:180px;margin:0 auto;}
+	footer .contact{width:185px;margin:0 auto;padding-left:15px;}
+	q {margin-bottom: 10px;display: block;}
+	#header-img{
+		width:150px;
+		height:150px;
+		position:relative;
+		margin: 0 auto;
+		-webkit-animation-duration: 1s;
+		animation-duration: 1s;
+		-webkit-animation-fill-mode: both;
+		animation-fill-mode: both;
+	}
+	#header-img:hover{
+		-webkit-animation-name: tada;
+		animation-name: tada;
+	}
+	.badge,.img-thumbnail{
+		-webkit-animation-duration: 1s;
+		animation-duration: 1s;
+		-webkit-animation-fill-mode: both;
+		animation-fill-mode: both;
+	}
+	.img-thumbnail:hover{
+		-webkit-animation-name: tada;
+		animation-name: tada;
+	}
+	.badge:hover{
+		-webkit-animation-name: tada;
+		animation-name: tada;
+	}
+
+	#box{width:150px;height:150px; background:url(avatar.png);position:absolute;background-size: 150px;cursor:pointer;}
+	#left_eye{width:20px;height:25px;background:url(pupil.png);position:absolute;left:42px; top:53px;background-size:20px;}
+	#right_eye{width:20px;height:25px;background:url(pupil.png);position:absolute;left:92px; top:53px;background-size:20px}
+
+	@-webkit-keyframes tada {
+		0% {-webkit-transform: scale(1);}
+		10%, 20% {-webkit-transform: scale(0.9) rotate(-3deg);}
+		30%, 50%, 70%, 90% {-webkit-transform: scale(1.1) rotate(3deg);}
+		40%, 60%, 80% {-webkit-transform: scale(1.1) rotate(-3deg);}
+		100% {-webkit-transform: scale(1) rotate(0);}
+	}
+
+	#tag_cloud_widget{
+		position:relative;
+		height:240px;
+		overflow: hidden;
+	}
+
+	#tag_cloud_widget a{
+		position:absolute;
+		padding: .2em .6em .25em;
+	    font-size: 14px;
+	    font-weight: 200;
+	    line-height: 1;
+	    color: #fff;
+	    text-align: center;
+	    white-space: nowrap;
+	    vertical-align: baseline;
+	    border-radius: .15em;
+	}

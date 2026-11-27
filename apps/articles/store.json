@@ -1,0 +1,8 @@
+{
+  "summary": "文章写作、三级分类标签、封面裁剪、AI 辅助、站点设置与公开阅读站",
+  "category": "productivity",
+  "tags": ["文章", "博客", "Markdown", "公开站", "AI"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/desk-store"
+}

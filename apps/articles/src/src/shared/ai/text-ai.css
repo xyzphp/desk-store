@@ -1,0 +1,125 @@
+/* 文字编辑 / 聊天面板在 .desk-form-ai-layer 的基础上补充动作网格、原文对比与参考标签，来源：ai-assist.css。 */
+@layer ds {
+  /* 入口组：与宿主工具栏同一行右对齐，提示文字在按钮前、可收缩换行，不再独占一行把按钮挤到下一行左侧。 */
+  .desk-text-ai-actions {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .desk-text-ai-actions:empty {
+    display: none;
+  }
+  .desk-text-ai-actions > .ds-button {
+    flex-shrink: 0;
+  }
+  .desk-text-ai-feedback {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .desk-text-ai-actions > .desk-text-ai-feedback {
+    text-align: end;
+  }
+  .desk-text-ai-feedback[role='alert'] {
+    color: var(--ds-danger);
+  }
+  /* 便签底栏沿原站 .desktop-note-footer > .workspace-toolbar-actions .workspace-button：透明底，贴合纸张颜色。 */
+  .ds-note-tools .desk-text-ai-actions > .ds-button {
+    background: transparent;
+  }
+  .ds-note-tools .desk-text-ai-actions > .ds-button:hover:not(:disabled) {
+    background: var(--hover);
+  }
+  .desk-text-ai-layer .ai-assist-actions {
+    display: grid;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+    gap: 7px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .desk-text-ai-layer .ai-assist-actions > .ds-button {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--ds-radius-sm, calc(7px * var(--ds-radius-scale)));
+    background: var(--bg-panel);
+    color: var(--text);
+  }
+  .desk-text-ai-layer .ai-assist-actions > .ds-button[aria-pressed='true'] {
+    border-color: var(--ds-selection-border);
+    background: var(--ds-selection-bg);
+    color: var(--accent);
+  }
+  .desk-text-ai-layer .ai-assist-actions > .ds-button > span {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .desk-text-ai-layer .ai-assist-comparison.is-comparing:not([hidden]) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .desk-text-ai-layer .ai-assist-compare-pane > .workspace-field-heading {
+    min-height: 32px;
+    font-size: 13px;
+  }
+  .desk-text-ai-layer .ai-assist-compare-pane > .workspace-field {
+    flex: 1;
+  }
+  .desk-text-ai-layer pre.workspace-field {
+    min-height: 180px;
+    max-height: 280px;
+    margin: 0;
+    overflow: auto;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .desk-text-ai-layer .ai-assist-output {
+    --workspace-field-min-height: 180px;
+    width: 100%;
+    max-height: 280px;
+    line-height: 1.6;
+    resize: vertical;
+  }
+  .desk-text-ai-layer .ai-assist-prompt {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .desk-text-ai-layer .ai-assist-prompt pre.workspace-field {
+    min-height: 64px;
+    max-height: 220px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .desk-text-ai-layer .workspace-composer-controls > .ds-select,
+  .desk-text-ai-layer .workspace-composer-controls select {
+    max-width: 100%;
+  }
+  @container form-ai (max-width: 520px) {
+    .desk-text-ai-layer .ai-assist-actions {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .desk-text-ai-layer .ai-assist-comparison.is-comparing:not([hidden]) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @container form-ai (max-width: 320px) {
+    .desk-text-ai-layer .ai-assist-actions {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+}

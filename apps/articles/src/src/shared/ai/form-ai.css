@@ -1,0 +1,609 @@
+@layer ds {
+  .desk-form-ai-entry {
+    flex-shrink: 0;
+  }
+  .desk-form-ai-layer {
+    position: fixed;
+    z-index: 9650;
+    display: flex;
+    width: min(680px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 60px);
+    flex-direction: column;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-panel);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-size: 13px;
+    animation: ai-assist-enter 0.16s ease-out;
+    container-type: inline-size;
+    container-name: form-ai;
+  }
+  .desk-form-ai-layer > .resizer {
+    touch-action: none;
+  }
+  .desk-form-ai-layer > .resizer:focus-visible {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: -2px;
+  }
+  .desk-form-ai-picker {
+    z-index: 9660;
+    width: 320px;
+    padding: 12px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  .desk-form-ai-picker .ai-assist-picker-section {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+  }
+  .desk-form-ai-picker .ai-assist-picker-section legend {
+    margin-bottom: 8px;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .desk-form-ai-picker .ai-assist-picker-option {
+    justify-content: flex-start;
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+  .desk-form-ai-picker .ai-assist-picker-option > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .desk-form-ai-picker .ai-assist-picker-check {
+    display: flex;
+    flex: 0 0 14px;
+    margin-left: auto;
+    visibility: hidden;
+  }
+  .desk-form-ai-picker .ai-assist-picker-option[aria-pressed='true'] .ai-assist-picker-check {
+    visibility: visible;
+  }
+  .desk-form-ai-picker .ai-assist-size-options {
+    display: grid;
+    gap: 4px;
+  }
+  .desk-form-ai-picker .ai-assist-quality {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .desk-form-ai-picker .ai-assist-quality output {
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .desk-form-ai-picker .ai-assist-quality-ticks {
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .desk-form-ai-picker .ai-assist-image-custom:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .desk-form-ai-picker .ai-assist-image-custom label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .desk-form-ai-picker .ai-assist-image-custom input {
+    width: 86px;
+  }
+  .desk-form-ai-picker .ai-assist-image-custom > p {
+    flex-basis: 100%;
+  }
+  .desk-form-ai-picker .workspace-range,
+  .desk-form-ai-layer .workspace-range {
+    --range-fill: 0%;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    margin: 12px 0;
+    border-radius: 99px;
+    background: linear-gradient(to right, var(--accent) var(--range-fill), var(--hover) var(--range-fill));
+    cursor: pointer;
+  }
+  .desk-form-ai-picker .workspace-range::-webkit-slider-thumb,
+  .desk-form-ai-layer .workspace-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg-panel);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--text) 18%, transparent);
+  }
+  .desk-form-ai-picker .workspace-range::-moz-range-thumb,
+  .desk-form-ai-layer .workspace-range::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg-panel);
+  }
+  .desk-form-ai-picker .workspace-range:focus-visible,
+  .desk-form-ai-layer .workspace-range:focus-visible {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: 5px;
+  }
+  .desk-form-ai-picker .workspace-range:disabled,
+  .desk-form-ai-layer .workspace-range:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .desk-form-ai-picker .ai-assist-picker-caption {
+    margin-left: auto;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .desk-form-ai-picker .ai-assist-picker-caption + .ai-assist-picker-check {
+    margin-left: 0;
+  }
+  .desk-form-ai-layer .ai-assist-field-result-body {
+    display: flex;
+    flex-direction: column;
+  }
+  .desk-form-ai-layer .ai-assist-field-result-body > textarea {
+    resize: vertical;
+  }
+  .desk-form-ai-layer .ai-assist-reference-row {
+    max-width: 100%;
+  }
+  .desk-form-ai-layer .ai-assist-head {
+    touch-action: none;
+    user-select: none;
+  }
+  .desk-form-ai-layer .ai-assist-head:focus-visible {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: -2px;
+  }
+  .desk-form-ai-layer .ai-assist-body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .desk-form-ai-layer .workspace-field {
+    min-width: 0;
+    min-height: var(--workspace-field-min-height, 34px);
+    padding: 6px 9px;
+    border: 1px solid var(--border);
+    border-radius: calc(7px * var(--ds-radius-scale));
+    background: var(--bg-panel);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    color-scheme: light dark;
+  }
+  .desk-form-ai-layer .workspace-field:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--text) 28%, transparent);
+    outline-offset: -2px;
+  }
+  .desk-form-ai-layer .workspace-composer:focus-within,
+  .desk-form-ai-layer .workspace-field-group:focus-within {
+    border-color: color-mix(in srgb, var(--text) 30%, var(--border));
+  }
+  .desk-form-ai-layer .ai-assist-form-fields {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+  }
+  .desk-form-ai-layer .ai-assist-comparison:not([hidden]) {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .desk-form-ai-layer .ai-assist-preview:not([hidden]) {
+    animation: ai-assist-enter 0.16s ease-out;
+  }
+  .desk-form-ai-layer .ai-assist-pending:not([hidden]) {
+    --workspace-field-min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-2);
+    text-align: center;
+  }
+  .desk-form-ai-layer .ai-assist-pending > .ai-assist-progress {
+    align-self: stretch;
+  }
+  .desk-form-ai-layer .ai-assist-progress:not([hidden]) {
+    display: grid;
+    gap: 10px;
+    padding: 10px 0;
+  }
+  .desk-form-ai-layer .ai-assist-progress span {
+    height: 9px;
+    border-radius: calc(5px * var(--ds-radius-scale));
+    background: linear-gradient(90deg, var(--hover), color-mix(in srgb, var(--accent) 16%, var(--hover)), var(--hover));
+    background-size: 200% 100%;
+    animation: ai-assist-pulse 1.2s ease-in-out infinite;
+  }
+  .desk-form-ai-layer .ai-assist-progress span:nth-child(2) {
+    width: 90%;
+    animation-delay: 0.1s;
+  }
+  .desk-form-ai-layer .ai-assist-progress span:last-child {
+    width: 65%;
+    animation-delay: 0.2s;
+  }
+  .desk-form-ai-layer .ai-assist-result-field:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0;
+    font-size: 12px;
+  }
+  .desk-form-ai-layer .ai-assist-result-field + .ai-assist-result-field {
+    border-top: 1px solid var(--border);
+  }
+  .desk-form-ai-layer .ai-assist-field-heading {
+    display: flex;
+    min-height: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .desk-form-ai-layer .ai-assist-field-title {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .desk-form-ai-layer .ai-assist-field-title > strong {
+    overflow-wrap: anywhere;
+    font-size: 13px;
+  }
+  .desk-form-ai-layer .ai-assist-field-heading [data-ai-reference-heading]:empty,
+  .desk-form-ai-layer .ai-assist-field-heading [data-ai-request-heading]:empty {
+    display: none;
+  }
+  .desk-form-ai-layer .ai-assist-current-reference:not([hidden]) {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .desk-form-ai-layer .workspace-count {
+    min-width: 22px;
+    padding: 2px 6px;
+    border-radius: 99px;
+    background: var(--hover);
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .desk-form-ai-layer .workspace-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+  }
+  .desk-form-ai-layer .ai-assist-field-toggle {
+    display: inline-flex;
+    min-width: 28px;
+    min-height: 28px;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border: 0;
+    border-radius: calc(6px * var(--ds-radius-scale));
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  .desk-form-ai-layer .ai-assist-field-toggle:hover {
+    background: var(--hover);
+    color: var(--accent);
+  }
+  .desk-form-ai-layer .ai-assist-field-toggle[aria-expanded='true'] > .ds-icon {
+    transform: rotate(90deg);
+  }
+  .desk-form-ai-layer .ai-assist-field-comparison:not([hidden]) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .desk-form-ai-layer .ai-assist-field-comparison.is-long-field {
+    --workspace-field-min-height: 112px;
+  }
+  .desk-form-ai-layer .ai-assist-field-comparison.is-reference-only {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .desk-form-ai-layer .ai-assist-compare-pane {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .desk-form-ai-layer .workspace-field-group {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: calc(7px * var(--ds-radius-scale));
+    background: var(--bg-panel);
+  }
+  .desk-form-ai-layer .workspace-field-heading {
+    display: flex;
+    min-width: 0;
+    min-height: 24px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .desk-form-ai-layer .workspace-toolbar-title {
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 550;
+  }
+  .desk-form-ai-layer .workspace-field-content {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .desk-form-ai-layer pre.workspace-field-content {
+    max-height: 180px;
+    overflow: auto;
+  }
+  .desk-form-ai-layer textarea.workspace-field-content,
+  .desk-form-ai-layer .workspace-field-group > textarea {
+    resize: vertical;
+  }
+  .desk-form-ai-layer .ai-assist-field-placeholder {
+    display: flex;
+    min-height: 64px;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-2);
+    text-align: center;
+  }
+  .desk-form-ai-layer .ai-assist-feedback {
+    margin: 0;
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .desk-form-ai-layer .ai-assist-feedback.is-error {
+    color: var(--ds-danger);
+  }
+  .desk-form-ai-layer .ai-assist-bottom {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .desk-form-ai-layer .workspace-composer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px 10px;
+  }
+  .desk-form-ai-layer .workspace-composer > .workspace-composer-instruction {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    min-height: 32px;
+    max-height: 96px;
+    padding: 5px 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1.6;
+    resize: none;
+    overflow-y: auto;
+  }
+  /* 来源：workspace-ui.css .workspace-composer-controls；尺寸 / 质量等选择项横排并可换行。 */
+  .desk-form-ai-layer .workspace-composer-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-width: 0;
+    gap: 4px 8px;
+  }
+  .desk-form-ai-layer .workspace-composer-controls:empty {
+    display: none;
+  }
+  .desk-form-ai-layer .workspace-composer-choice {
+    min-width: 0;
+    max-width: 160px;
+    padding: 5px 6px;
+  }
+  .desk-form-ai-layer .workspace-composer-meta {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-2);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desk-form-ai-layer .workspace-composer-send {
+    flex: 0 0 32px;
+    width: 32px;
+    min-height: 32px;
+    padding: 6px;
+    border-radius: 50%;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--ds-on-accent);
+  }
+  .desk-form-ai-layer .ai-assist-status:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+  .desk-form-ai-layer .ai-assist-status > .ai-assist-feedback {
+    flex: 1;
+    min-width: 0;
+  }
+  .desk-form-ai-layer .ai-assist-status > .ds-button {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  .desk-form-ai-layer .ai-assist-footer:not([hidden]) {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .desk-form-ai-layer .ai-assist-footer > label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .desk-form-ai-layer .workspace-composer > .workspace-toolbar-actions {
+    grid-column: 2;
+    justify-self: end;
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .desk-form-ai-layer .ai-assist-options {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .desk-form-ai-layer .ai-assist-reference-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .desk-form-ai-layer .ai-assist-reference-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-2);
+    font-size: 12px;
+  }
+  .desk-form-ai-layer .workspace-tag {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 28px;
+    gap: 5px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: calc(7px * var(--ds-radius-scale));
+    background: var(--bg-panel);
+    color: var(--text);
+    font-size: 12px;
+  }
+  .desk-form-ai-layer .workspace-tag .workspace-toggle {
+    min-width: 0;
+  }
+  .desk-form-ai-layer .workspace-tag .workspace-toggle > span:last-child {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .desk-form-ai-layer .ai-assist-reference-detail {
+    max-height: 220px;
+    margin: 8px 0 0;
+    overflow: auto;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  @container form-ai (max-width: 380px) {
+    .desk-form-ai-layer .workspace-composer {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .desk-form-ai-layer .workspace-composer > .workspace-toolbar-actions {
+      grid-column: 1;
+    }
+  }
+  /* 与 .desk-text-ai-feedback 一致：次要色小字，可收缩换行，不强制独占一行。 */
+  .desk-form-ai-feedback {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--text-2);
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .desk-form-ai-feedback[role='alert'] {
+    color: var(--ds-danger);
+  }
+  @container form-ai (max-width: 520px) {
+    .desk-form-ai-layer .ai-assist-field-comparison:not([hidden]) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .desk-form-ai-layer,
+    .desk-form-ai-layer .ai-assist-preview,
+    .desk-form-ai-layer .ai-assist-progress span {
+      animation: none;
+    }
+  }
+  @keyframes ai-assist-enter {
+    from {
+      opacity: 0;
+      transform: translateY(3px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes ai-assist-pulse {
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
