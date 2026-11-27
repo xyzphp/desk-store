@@ -19,9 +19,10 @@ const mixedManifest = `{
   "surfaces": {"home": "/", "window": {"pages": [{"path": "/admin/", "visibility": "permission:note.write"}]},
     "standalone": {"enabled": true},
     "public": {"pages": [{"path": "/", "visibility": "public"}], "alias": "/notes", "session": "optional"}},
-  "platform": {"uses": ["identity", "notify"], "provides": {"settings": {"fields": []}, "account_deleted": {"route": "/hooks/account-deleted"}}},
+  "platform": {"uses": ["identity", "notify"], "provides": {"settings": {"fields": []}, "account_deleted": {"route": "/hooks/account-deleted"},
+    "builtin_import": {"sources": ["articles.site"], "route": "/tools/import"}}},
   "backend": {"runtime": "wasm", "abi": 1, "module": "backend/app.wasm",
-    "routes": [{"path": "/notes", "methods": ["GET", "POST"], "visibility": "app"},
+    "routes": [{"path": "/notes", "methods": ["GET", "POST"], "visibility": "app", "token_scope": "notes"},
       {"path": "/public/*", "methods": ["GET"], "visibility": "public", "rate_limit": "60/min"},
       {"path": "/tools/*", "methods": ["POST"], "visibility": "app"},
       {"path": "/hooks/account-deleted", "methods": ["POST"], "visibility": "app"},
@@ -29,7 +30,8 @@ const mixedManifest = `{
     "storage": {"shared": true, "public": true},
     "http": {"allow": [{"host": "api.example.com", "methods": ["GET"]}]},
     "schedules": [{"name": "digest", "cron": "0 9 * * *", "route": "/jobs/digest"}],
-    "config": [{"key": "api_secret", "title": "接口密钥", "secret": true}]},
+    "config": [{"key": "api_secret", "title": "接口密钥", "secret": true}],
+    "token_scopes": [{"id": "notes", "label": "读写笔记", "description": "读取与新增本人的笔记"}]},
   "mcp": {"tools": [
       {"name": "get_weather", "title": "查天气", "description": "按城市查询天气",
        "input_schema": {"type": "object", "properties": {"city": {"type": "string"}}, "required": ["city"]},
@@ -98,7 +100,16 @@ func TestFormatTwoRejectsInvalidDeclarations(t *testing.T) {
 		"schema keyword":          {`"maxLength": 2000`, `"pattern": ".*"`},
 		"read only and destructive": {`"annotations": {"destructive": true}`,
 			`"annotations": {"destructive": true, "read_only": true}`},
-		"skill not declared": {`"skills": ["note-taking"]`, `"skills": ["other-skill"]`},
+		"skill not declared":     {`"skills": ["note-taking"]`, `"skills": ["other-skill"]`},
+		"import unknown source":  {`"sources": ["articles.site"]`, `"sources": ["bookmarks"]`},
+		"import public route":    {`"route": "/tools/import"`, `"route": "/public/import"`},
+		"import missing route":   {`"route": "/tools/import"`, `"route": "/missing"`},
+		"import extra field":     {`"sources": ["articles.site"], "route"`, `"sources": ["articles.site"], "x": 1, "route"`},
+		"token scope undeclared": {`"token_scope": "notes"`, `"token_scope": "other"`},
+		"token scope unused":     {`{"id": "notes", "label"`, `{"id": "notes", "label": "x"}, {"id": "spare", "label"`},
+		"token scope bad id":     {`{"id": "notes", "label"`, `{"id": "Notes!", "label"`},
+		"token scope on public": {`"visibility": "public", "rate_limit": "60/min"}`,
+			`"visibility": "public", "rate_limit": "60/min", "token_scope": "notes"}`},
 	}
 	for name, change := range cases {
 		raw := strings.Replace(mixedManifest, change[0], change[1], 1)
@@ -226,7 +237,7 @@ func TestFormatTwoComponentsAndCapabilities(t *testing.T) {
 	for _, want := range []string{
 		"format.2", "platform.1", "backend.wasm.abi1", "storage.shared", "storage.public", "access.permissions",
 		"access.default_grant", "surface.standalone", "surface.public", "surface.public.session", "uses.notify",
-		"provides.account_deleted", "mcp.tools", "mcp.declarative", "mcp.prompts", "skills",
+		"provides.account_deleted", "backend.token_scopes", "mcp.tools", "mcp.declarative", "mcp.prompts", "skills",
 	} {
 		if !strings.Contains(","+marks+",", ","+want+",") {
 			t.Errorf("Capabilities() lacks %s: %s", want, marks)

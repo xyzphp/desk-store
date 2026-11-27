@@ -39,6 +39,7 @@
 | `hooks` | ≤ 8 个公开回调，地址 `{站点根}/custom/<slug>/hooks/<name>`，无会话，签名由模块校验 |
 | `schedules` | ≤ 8 个定时任务，标准五段 cron，最小间隔 5 分钟；以应用身份执行，没有调用者 |
 | `config` | ≤ 16 个安装配置项；`secret` 项加密保存，只能被模块读取，任何接口都不回显 |
+| `token_scopes` | ≤ 16 个个人令牌权限点 `{ id, label, description? }`（`id` 同 hooks 命名规则，`label` 1-16 字，`description` ≤ 120 字）；路由用 `token_scope: "<id>"` 引用（`public` 路由不能引用），每个权限点至少被一条路由引用。目标系统在个人令牌设置中按应用列出这些权限点（默认不勾选），令牌勾选后可直接以 `Authorization: Bearer` 调用引用该权限点的路由，仍按路由 `visibility` 校验账号权限；未声明 `token_scope` 的路由不接受令牌。能力标记 `backend.token_scopes` |
 
 ## 3. 接口约定（ABI 1）
 
@@ -75,7 +76,7 @@
 }
 ```
 
-- **调用上下文**由目标系统填写，模块不能修改：入口（`window` / `standalone` / `public` / `tool` / `schedule` / `hook` / `lifecycle`）、调用者（账号编号、显示名称；匿名与系统调用时为 `null`）、调用者在本应用内拥有的权限、语言、命中的路由模板与可见级别。
+- **调用上下文**由目标系统填写，模块不能修改：入口（`window` / `standalone` / `public` / `tool` / `token` / `import` / `schedule` / `hook` / `lifecycle`；`token` 为个人令牌按 `token_scopes` 调用，调用者为令牌所属账号，不能使用 `api_call`；`import` 为管理员触发的内置配置导入，见[平台接口 v1](04-platform-v1.md#33-builtin_import导入内置功能配置)）、调用者（账号编号、显示名称；匿名与系统调用时为 `null`）、调用者在本应用内拥有的权限、语言、命中的路由模板与可见级别。
 - 请求头白名单（键统一小写）：`accept`、`accept-language`、`content-type`、`if-match`、`if-none-match`、`if-modified-since`、`x-request-id`（`hook` 入口另放行签名类请求头；会话 Cookie、认证与 CSRF 头绝不透传）。
 - 响应信封通过 `host.response_write` 写入 UTF-8 JSON（编码后上限随响应体 1 MB 限制，重复调用以最后一次为准）：
 
@@ -88,7 +89,7 @@
 }
 ```
 
-- 响应头白名单（键统一小写）：`content-type`、`cache-control`、`etag`、`last-modified`、`vary`、`content-disposition` 与 `x-app-*` 前缀自定义头；禁止设置 `set-cookie`、`content-security-policy`、`location`、`access-control-*` 等安全相关响应头。`send_file` 为可选的 `/data/...` 路径，供目标系统直传下载。
+- 响应头白名单（键统一小写）：`content-type`、`cache-control`、`etag`、`last-modified`、`vary`、`content-disposition` 与 `x-app-*` 前缀自定义头；禁止设置 `set-cookie`、`content-security-policy`、`location`、`access-control-*` 等安全相关响应头。`send_file` 为可选的 `/data/...` 路径或已登记引用的用户文件 `file:<id>`，供目标系统直传下载（见第 3.7 节）。
 
 ### 3.3 宿主函数（模块名 `host`）
 
@@ -203,6 +204,14 @@
     - `settings.get`（需要 `platform.provides.settings`）：返回 `{ "values": { ... }, "updated_at": 1700000000000 }`。
     - `identity.me`（需要 `platform.uses` 含 `identity` 且存在调用者）：返回 `{ "id": 12, "display_name": "Alice", "avatar_url": "..." }`。
     - `notify.send`（需要 `platform.uses` 含 `notify`）：`params` 为 `{ "title": "...", "body": "...", "user_id": 12 }`；存在调用者时 `user_id` 可省（默认为调用者本人），无调用者时必填；目标账号必须处于正常状态且已获授该应用，返回 `{ "ok": true }`。
+    - `files.reference.add` / `files.reference.remove` / `files.reference.list`（需要 `platform.uses` 含 `files.reference` 且存在登录调用者）：按 `file_id`（`file:<id>`）与可选 `ref_key` 登记、解除或查询应用对用户管理文件的引用，防止文件在文件管理中被误删；应用卸载时由宿主自动释放。
+    - `files.reference.read`（需要 `platform.uses` 含 `files.reference`，任意入口可用，包括 `public`、`schedule`、`hook`）：`params` 为 `{ "file_id": "file:<id>", "meta_only"?: true }`；只要有任一账号为本应用登记了该文件的引用即可读取，返回 `{ "file_id", "name", "media_type", "size", "width", "height", "updated_at", "data_b64" }`（`meta_only` 时不含 `data_b64`）；内容超过 4 MB 返回限额错误，应改用 `send_file`。谁能看到文件由应用按自己的数据判断（如文章是否公开发布）；作者解除全部引用后应用即不能再读取。
+    - `ai.complete`（需要 `platform.uses` 含 `ai.complete`，`public` 与 `hook` 入口禁止）：`params` 为 `{ "system"?: "...", "messages": [{ "role": "user", "content": "..." }], "max_output"?: 800, "response_format"?: "text"|"json" }`，规则同[平台接口 v1](04-platform-v1.md#2-平台能力) 的 `ai.complete`，返回 `{ "text", "model", "usage": { "input_tokens", "output_tokens" } }`；调用阻塞当前执行并受 `limits.timeout_ms` 约束，耗时较长的生成应放在页面调用。`ai.image` 只能经页面调用，后端调用返回 `-2`。
+    - `image.sanitize`（需要 `platform.uses` 含 `image.sanitize`，`public` 入口禁止）：`params` 为 `{ "source_path"?: "/data/...", "data_b64"?: "...", "dest_path": "/data/...", "format"?: "png"|"jpeg", "quality"?: 85 }`；严格校验 PNG / JPEG 并重新编码剥离元数据与尾部字节，写入受配额约束的 `dest_path`，返回 `{ "path", "media_type", "width", "height", "size", "sha256" }`。
+
+- **公开页面 SSR 路由约定**：当应用同时声明 `surfaces.public` 与 `backend` 时，目标系统对公开访问的页面请求优先匹配以下 `visibility: "public"` 的后端路由（未声明时回落至包内静态页面）：
+  - 公开根路径 `/` → `GET /public/ssr`；子路径 `/{rest}` → `GET /public/ssr/{rest}`（返回 `text/html` 时由目标系统自动注入 `<base>`、只读公开上下文与安全响应头）。
+  - `/sitemap.xml` → `GET /public/sitemap.xml`；`/rss.xml` → `GET /public/rss.xml`；`/feed.xml` → `GET /public/feed.xml`。
 
 ### 3.6 公开回调（`hooks`）、定时任务（`schedules`）与迁移钩子（`migrate`）
 
@@ -229,6 +238,7 @@
 
   模块可经标准 `/data` 文件接口校验或重命名该文件到最终位置；若模块执行失败或返回 `status >= 400` 且临时文件仍在原处，目标系统自动删除并退回配额。
 - **大文件下载（`send_file`）**：模块在响应信封中设置 `send_file` 为 `/data/shared/...`、`/data/public/...` 或 `/data/me/...`（不设 `body_b64`），目标系统校验范围、路径与符号链接后直接流式输出文件内容（不受 1 MB 响应体限制），自动附加 `X-Content-Type-Options: nosniff` 与安全 `Content-Disposition`。
+- **发送用户文件（`send_file: "file:<id>"`）**：声明了 `platform.uses: ["files.reference"]` 的应用可把 `send_file` 设为已登记引用的用户文件编号，目标系统从文件管理的存储（本地或 S3）直接流式输出，`content-type` 未指定时使用文件记录的类型；文件未被本应用引用或已删除时返回 404。安全响应头与 `/data` 文件相同。
 
 ## 4. 存储
 

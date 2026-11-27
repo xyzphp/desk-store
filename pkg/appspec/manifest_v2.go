@@ -1,11 +1,13 @@
 package appspec
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -86,7 +88,11 @@ var PlatformCapabilities = map[string]bool{
 var ExtensionPoints = map[string]bool{
 	"settings": false, "open_with": false, "widget": false,
 	"lifecycle": true, "account_deleted": true, "health": true, "search": true, "notification_action": true, "export": true,
+	"builtin_import": true,
 }
+
+// BuiltinImportSources 是 builtin_import 扩展点可声明的内置功能配置来源。
+var BuiltinImportSources = []string{"articles.site"}
 
 // reservedAliases 是公开入口不能占用的站点路径（目标系统还可能保留更多）。
 var reservedAliases = []string{"/api", "/xyzos", "/custom", "/apps", "/app", "/p", "/s", "/sdk", "/assets", "/static", "/healthz", "/setup", "/login", "/logout"}
@@ -324,6 +330,11 @@ func (m *Manifest) validatePlatform() error {
 		if json.Unmarshal(raw, &params) == nil && params.Route != "" && !m.Backend.hasRoute(params.Route, "POST") {
 			return fmt.Errorf("扩展点 %q 的 route %q 没有在 backend.routes 中以 POST 声明", name, params.Route)
 		}
+		if name == "builtin_import" {
+			if err := m.validateBuiltinImport(raw); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -337,4 +348,41 @@ func fileByPath(files []File, name string) (File, bool) {
 		}
 	}
 	return File{}, false
+}
+
+// validateBuiltinImport 校验 builtin_import：{ sources: [...], route: "/..." }，来源只能是 BuiltinImportSources 中的项，route 必填。
+func (m *Manifest) validateBuiltinImport(raw json.RawMessage) error {
+	var spec struct {
+		Sources []string `json:"sources"`
+		Route   string   `json:"route"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&spec); err != nil {
+		return errors.New("builtin_import 的参数格式无效（须为 {\"sources\": [...], \"route\": \"/...\"}）")
+	}
+	if len(spec.Sources) == 0 || len(spec.Sources) > len(BuiltinImportSources) {
+		return fmt.Errorf("builtin_import.sources 须有 1-%d 项", len(BuiltinImportSources))
+	}
+	seen := map[string]bool{}
+	for _, source := range spec.Sources {
+		if !slices.Contains(BuiltinImportSources, source) || seen[source] {
+			return fmt.Errorf("builtin_import.sources 中的 %q 无效或重复", source)
+		}
+		seen[source] = true
+	}
+	if spec.Route == "" {
+		return errors.New("builtin_import.route 必填")
+	}
+	// 导入以管理员身份执行，命中的 POST 路由都不能是 public。
+	for _, route := range m.Backend.Routes {
+		matches := route.Path == spec.Route
+		if prefix, ok := strings.CutSuffix(route.Path, "*"); ok {
+			matches = strings.HasPrefix(spec.Route, prefix)
+		}
+		if matches && slices.Contains(route.Methods, "POST") && route.Visibility == "public" {
+			return fmt.Errorf("builtin_import.route %q 不能是 public 路由", spec.Route)
+		}
+	}
+	return nil
 }

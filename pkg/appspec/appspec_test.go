@@ -43,6 +43,32 @@ func TestParseManifestRejectsInvalidDeclarations(t *testing.T) {
 	}
 }
 
+func TestWindowMinimumSize(t *testing.T) {
+	withWindow := func(window string) string {
+		return strings.Replace(minimalManifest, `"icon":"icon.svg"`, `"icon":"icon.svg","window":`+window, 1)
+	}
+	manifest, err := ParseManifest([]byte(withWindow(`{"width":1400,"height":800,"min_width":1400,"min_height":600}`)), minimalFiles())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(manifest.Capabilities(), ","); got != "window,window.min_size" {
+		t.Fatalf("capabilities = %s", got)
+	}
+	if manifest, err = ParseManifest([]byte(withWindow(`{"width":900,"height":620}`)), minimalFiles()); err != nil || strings.Join(manifest.Capabilities(), ",") != "window" {
+		t.Fatalf("plain window: %v %v", manifest, err)
+	}
+	for _, window := range []string{
+		`{"width":900,"height":620,"min_width":1000}`,
+		`{"width":900,"height":620,"min_width":200}`,
+		`{"width":900,"height":620,"min_height":700}`,
+		`{"width":900,"height":620,"min_height":100}`,
+	} {
+		if _, err := ParseManifest([]byte(withWindow(window)), minimalFiles()); err == nil {
+			t.Errorf("invalid window accepted: %s", window)
+		}
+	}
+}
+
 func TestPackIsDeterministicAndRoundTrips(t *testing.T) {
 	pkg := &Package{ManifestRaw: []byte(minimalManifest), Files: minimalFiles()}
 	first, err := pkg.Pack()

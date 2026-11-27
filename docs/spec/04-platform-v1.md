@@ -44,10 +44,16 @@
 | `identity` / `me` | — | `{ id, displayName, avatarUrl? }`；不含用户名、邮箱、手机号 |
 | `notify` / `send` | `{ title, body? }` | 以应用名义给**调用者本人**发站内通知；标题 1–100 个字符、正文 ≤ 500 个字符；目标系统可限制频率 |
 | `directory.pick` / `pick` | `{ multiple? }` | 系统选人窗口，返回选中成员 `[{ id, displayName }]`，取消为 `null`；只能选到能使用本应用的成员 |
-| `files.pick` / `pick` | — | 系统文件选择窗口，返回 `{ name, mediaType, size, url, expiresAt }`，取消为 `null` |
+| `files.pick` / `pick` | — | 系统文件选择窗口，返回 `{ fileId, name, mediaType, size, url, expiresAt }`，取消为 `null` |
+| `files.reference` / `add`、`remove`、`list` | `add`/`remove`: `{ fileId, refKey? }` | 登记、解除或查询应用对已选管理文件的引用；被引用文件禁止回收或删除，应用卸载时自动释放 |
+| `image.sanitize` / `sanitize` | `{ fileId?, dataBase64?, format?, quality?, destPath? }` | 仅接受 PNG / JPEG 并重新编码清洗；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size, sha256 }`，否则返回 `dataBase64` |
+| `ai.complete` / `complete` | `{ system?, messages: [{ role, content }], maxOutput?, responseFormat? }` | 用目标系统的默认文本模型补全文本，返回 `{ text, model, usage: { inputTokens, outputTokens } }`；`role` 只能是 `user` / `assistant` 且最后一条为 `user`，最多 40 条、合计 ≤ 100000 字，`system` ≤ 8000 字，`responseFormat` 为 `text` / `json`；应用拿不到模型地址与密钥，按应用每日计量，超出管理员设定的上限返回 429，上限为 0 时返回 403 |
+| `ai.image` / `generate` | `{ prompt, size?, quality?, destPath? }` | 生成一张 PNG：`prompt` ≤ 4000 字，`size` 为 `auto` 或 `宽x高` 比例（1:3–3:1），`quality` 为 `auto` / `low` / `medium` / `high`；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size }`，否则返回 `dataBase64`；需目标系统已开启生图，计量与限额同上 |
 | `ui` / `toast` | `{ title, message?, type? }` | 系统通知条，`type` 为 `info` / `success` / `error` |
 | `ui` / `alert`、`confirm` | `{ title, message?, okText?, cancelText?, danger? }` | 系统对话框；`confirm` 返回布尔值 |
 | `ui` / `openApp` | `{ id, params? }` | 打开用户能使用的其他应用；`params.openWith` 会被去掉 |
+| `ui` / `openPublicSite` | `{ path? }` | 在新标签页打开本应用的公开页（需声明 `surfaces.public` 且管理员已开启公开入口）；`path` 是公开页内的相对路径，不能含协议、主机或 `..` |
+| `ui` / `resolveLink`、`openLink` | `{ uri }` | 解析或打开 `xyzos://app/{slug}/{path}` 跨应用深链（在桌面打开窗口，在独立页跳转对应独立地址） |
 | `workspace.state` / `get`、`save` | `save` 传可 JSON 序列化的状态 | 窗口刷新后恢复的状态，按账号与窗口保存，目标系统可限制大小 |
 | `settings` / `get` | — | 应用设置的当前值（见 3.1），只需声明扩展点 `settings` |
 
@@ -91,6 +97,29 @@
 | `path` | 可选，从文件管理打开时加载的窗口页面（须是包内 HTML 页面，目录形式找 `index.html`）；缺省为 `surfaces.home` |
 
 需要应用有窗口界面（`entry`）。用户在系统文件管理中对单个文件选择“用…打开”后，系统检查文件可读、类型匹配，签发与 `files.pick` 相同的一次性读取地址，并以启动参数 `params.openWith = { name, mediaType, size, url, expiresAt }` 打开应用窗口；窗口已打开时发送 `app:params:{appId}` 事件。启动参数不随窗口状态保存，刷新后不会重放。匹配按媒体类型（忽略参数）与扩展名。
+
+### 3.3 builtin_import：导入内置功能配置
+
+```json
+{ "builtin_import": { "sources": ["articles.site"], "route": "/import/builtin" } }
+```
+
+| 字段 | 规则 |
+| --- | --- |
+| `sources` | 1 项起，目前只有 `articles.site`（目标系统内置文章站点的站点设置、站点图片与一言记录） |
+| `route` | 必填，须在 `backend.routes` 中以非 `public` 的 `POST` 声明 |
+
+需要后端模块。管理员在目标系统的应用管理中点击“导入内置配置”后，目标系统以 `POST` 调用 `route`，请求上下文 `entry` 为 `import`、调用者为该管理员，请求体为：
+
+```json
+{ "source": "articles.site", "exported_at": 1700000000000,
+  "data": { "configured": true, "config": { "name": "...", "logoImage": 12, "...": "..." }, "revision": 3, "updated_at": 1700000000000,
+    "files": [{ "file_id": "file:12", "name": "logo.png", "media_type": "image/png", "size": 2048, "width": 64, "height": 64 }],
+    "quotes": [{ "day": "2026-11-26", "text": "...", "status": "ready", "source": "api", "fetched_at": 0, "updated_at": 0 }],
+    "missing_files": ["file:99"] } }
+```
+
+`config` 保持目标系统内置站点设置的原始结构，其中的图片字段是文件编号数字（对应 `files` 中的 `file:<id>`）；`missing_files` 是配置引用、但已不在文件管理中的图片。目标系统会以文件所有者的名义为本应用登记这些图片的引用（需要 `platform.uses` 含 `files.reference`），应用随后可用 `files.reference.read` 或 `send_file: "file:<id>"` 读取；路由返回 `status >= 400` 时撤回本次新登记的引用。可重复导入，应用应按覆盖写入处理；请求体不超过 1 MB。
 
 ## 4. 托管组件库与主题
 

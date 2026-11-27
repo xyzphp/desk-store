@@ -134,6 +134,9 @@ func (m Manifest) formatTwoCapabilities() []string {
 		for _, scope := range b.StorageScopes() {
 			marks = append(marks, "storage."+scope)
 		}
+		if len(b.TokenScopes) > 0 {
+			marks = append(marks, "backend.token_scopes")
+		}
 	}
 	if a := m.Access; a != nil {
 		if len(a.Permissions) > 0 {

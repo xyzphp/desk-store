@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   check:
@@ -48,15 +49,41 @@ jobs:
         run: |
           base="$(jq -r .homepage store.config.json)api/v1"
           changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- apps/ | cut -d/ -f2 | sort -u)
-          echo "## 权限摘要" >> "$GITHUB_STEP_SUMMARY"
-          for slug in $changed; do
-            if [ -d "apps/$slug" ]; then
-              go run ./cmd/appcheck summary "apps/$slug" -base "$base" >> "$GITHUB_STEP_SUMMARY"
-              echo >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "- 删除了 \`$slug\`（发布后会显示为已下架）" >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p dist
+          summary="dist/pr-permission-summary.md"
+          {
+            echo "<!-- desk-store-permission-summary -->"
+            echo "## 权限摘要"
+            if [ -z "$changed" ]; then
+              echo "- 本次 Pull Request 未修改 \`apps/\` 目录。"
             fi
-          done
+            for slug in $changed; do
+              if [ -d "apps/$slug" ]; then
+                go run ./cmd/appcheck summary "apps/$slug" -base "$base"
+                echo
+              else
+                echo "- 删除了 \`$slug\`（发布后会显示为已下架）"
+              fi
+            done
+          } > "$summary"
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment permission summary on Pull Request
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          summary="dist/pr-permission-summary.md"
+          [ -s "$summary" ] || exit 0
+          marker="<!-- desk-store-permission-summary -->"
+          existing=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | head -n 1 || true)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/${existing}" -F "body=@${summary}" >/dev/null
+          else
+            gh api -X POST "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" -F "body=@${summary}" >/dev/null
+          fi
       - name: Build the website
         run: |
           pnpm install --frozen-lockfile

@@ -115,6 +115,9 @@ func main() {}
 | 声明式代理 | `appkit.ProxyFetch(...)` | `proxies` |
 | 系统 API（以调用者身份） | `appkit.APICall(...)` | `gateway_api`（仅已认证调用者） |
 | 平台能力 | `appkit.SettingsGet` / `IdentityMe` / `NotifySend` | `platform.uses` 或 `provides.settings` |
+| 读取已引用的用户文件 | `appkit.FileReferenceRead(fileID, metaOnly)`（≤ 4 MB）、`c.SendUserFile(200, fileID, inline)`（流式） | `platform.uses: ["files.reference"]` |
+| AI 文本补全 | `appkit.AIComplete(messages, options)`（使用目标系统的默认文本模型，按应用计量与每日限额；`public` / `hook` 入口不可用）；生图只能在页面调用 `XYZOSSDK.platform.ai.image` | `platform.uses: ["ai.complete"]` / `["ai.image"]` |
+| 个人令牌接口 | 路由加 `token_scope`，入口 `c.Entry() == "token"` | `backend.token_scopes` |
 | 公开回调 | `r.HandleHook("POST", "payment", fn)` | `backend.hooks` |
 | 定时任务 | `r.HandleSchedule("/jobs/daily", fn)` | `backend.schedules` + `POST` 路由 |
 | 迁移数据钩子 | `//go:wasmexport migrate` + `appkit.DispatchMigrate(fn)` | 可选导出 |

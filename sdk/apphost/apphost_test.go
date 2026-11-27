@@ -174,3 +174,46 @@ func TestHostRouterDatabaseKVAndIntegrations(t *testing.T) {
 		t.Fatalf("unexpected logs: %+v", host.Logs())
 	}
 }
+
+func TestHostReferencedFilesAndAIComplete(t *testing.T) {
+	manifest := &appspec.Manifest{
+		Format: 2, Slug: "ref-demo", Version: "1.0.0",
+		Platform: &appspec.Platform{Uses: []string{"files.reference", "ai.complete"}},
+		Backend:  &appspec.Backend{Runtime: "wasm", ABI: 1, Module: "backend/app.wasm"},
+	}
+	host := apphost.New(
+		apphost.WithManifest(manifest),
+		apphost.WithReferencedFiles(map[string]apphost.ReferencedFile{"file:7": {Name: "cover.png", MediaType: "image/png", Data: []byte("png")}}),
+	)
+	defer host.Close()
+	var file appkit.ReferencedFile
+	var completion appkit.AICompletion
+	var missingErr, imageErr error
+	handler := appkit.HandlerFunc(func(c *appkit.Context) {
+		var err error
+		if file, err = appkit.FileReferenceRead("file:7", false); err != nil {
+			c.Error(http.StatusInternalServerError, err.Error())
+			return
+		}
+		_, missingErr = appkit.FileReferenceRead("file:8", true)
+		if completion, err = appkit.AIComplete([]appkit.AIMessage{{Role: "user", Content: "你好"}}, appkit.AICompleteOptions{}); err != nil {
+			c.Error(http.StatusInternalServerError, err.Error())
+			return
+		}
+		imageErr = appkit.PlatformCall("ai.image", map[string]any{"prompt": "x"}, nil)
+		c.SendUserFile(http.StatusOK, "file:7", true)
+	})
+	resp, err := host.Do(appkit.RequestEnvelope{Method: http.MethodGet, Path: "/x", Context: appkit.RequestContext{User: &appkit.User{ID: 1}}}, handler)
+	if err != nil || resp.Status != http.StatusOK || resp.SendFile != "file:7" || resp.Headers["content-disposition"] != "inline" {
+		t.Fatalf("unexpected response: %+v err=%v", resp, err)
+	}
+	if data, _ := base64.StdEncoding.DecodeString(file.DataB64); string(data) != "png" || file.Name != "cover.png" {
+		t.Fatalf("referenced file: %+v", file)
+	}
+	if !appkit.IsCode(missingErr, appkit.CodeNotFound) || !appkit.IsCode(imageErr, appkit.CodeDenied) {
+		t.Fatalf("missing=%v image=%v", missingErr, imageErr)
+	}
+	if !strings.Contains(completion.Text, "你好") {
+		t.Fatalf("completion: %+v", completion)
+	}
+}

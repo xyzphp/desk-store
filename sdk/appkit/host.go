@@ -272,3 +272,120 @@ func NotifySend(title, body string, userID int64) error {
 		"user_id": userID,
 	}, nil)
 }
+
+// SanitizedImage 是 platform_call("image.sanitize") 的返回元数据。
+type SanitizedImage struct {
+	Path      string `json:"path"`
+	MediaType string `json:"media_type"`
+	Width     int    `json:"width"`
+	Height    int    `json:"height"`
+	Size      int    `json:"size"`
+	SHA256    string `json:"sha256"`
+}
+
+// ImageSanitize 调用宿主清洗 PNG/JPEG 图片并写入应用隔离存储（/data/...），需要 platform.uses 包含 image.sanitize。
+func ImageSanitize(sourcePath, destPath string, data []byte, format string, quality int) (SanitizedImage, error) {
+	params := map[string]any{"dest_path": destPath}
+	if sourcePath != "" {
+		params["source_path"] = sourcePath
+	}
+	if len(data) > 0 {
+		params["data_b64"] = base64.StdEncoding.EncodeToString(data)
+	}
+	if format != "" {
+		params["format"] = format
+	}
+	if quality > 0 {
+		params["quality"] = quality
+	}
+	var out SanitizedImage
+	if err := PlatformCall("image.sanitize", params, &out); err != nil {
+		return SanitizedImage{}, err
+	}
+	return out, nil
+}
+
+// FileReferenceAdd 登记应用对指定管理文件的引用，防止被误删（需要 platform.uses 包含 files.reference）。
+func FileReferenceAdd(fileID, refKey string) error {
+	return PlatformCall("files.reference.add", map[string]any{
+		"file_id": fileID,
+		"ref_key": refKey,
+	}, nil)
+}
+
+// FileReferenceRemove 解除应用对指定管理文件的引用（refKey 为空时解除该文件的全部引用）。
+func FileReferenceRemove(fileID, refKey string) error {
+	return PlatformCall("files.reference.remove", map[string]any{
+		"file_id": fileID,
+		"ref_key": refKey,
+	}, nil)
+}
+
+// ReferencedFile 是 platform_call("files.reference.read") 的返回：已被本应用登记引用的用户文件。
+type ReferencedFile struct {
+	FileID    string `json:"file_id"`
+	Name      string `json:"name"`
+	MediaType string `json:"media_type"`
+	Size      int64  `json:"size"`
+	Width     int    `json:"width,omitempty"`
+	Height    int    `json:"height,omitempty"`
+	UpdatedAt int64  `json:"updated_at,omitempty"`
+	DataB64   string `json:"data_b64,omitempty"`
+}
+
+// FileReferenceRead 读取已被本应用登记引用的用户文件（任意入口可用，内容 ≤ 4 MB；metaOnly 只取元信息）。
+// 更大的文件请用 Context.SendUserFile 由宿主直接流式发送。需要 platform.uses 包含 files.reference。
+func FileReferenceRead(fileID string, metaOnly bool) (ReferencedFile, error) {
+	params := map[string]any{"file_id": fileID}
+	if metaOnly {
+		params["meta_only"] = true
+	}
+	var out ReferencedFile
+	if err := PlatformCall("files.reference.read", params, &out); err != nil {
+		return ReferencedFile{}, err
+	}
+	return out, nil
+}
+
+// AIMessage 是 AIComplete 的一条对话消息，role 只能是 user 或 assistant，最后一条须为 user。
+type AIMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// AICompleteOptions 是 AIComplete 的可选参数；ResponseFormat 为 "text"（默认）或 "json"。
+type AICompleteOptions struct {
+	System         string
+	MaxOutput      int
+	ResponseFormat string
+}
+
+// AICompletion 是 platform_call("ai.complete") 的返回。
+type AICompletion struct {
+	Text  string `json:"text"`
+	Model string `json:"model"`
+	Usage struct {
+		InputTokens  int `json:"input_tokens"`
+		OutputTokens int `json:"output_tokens"`
+	} `json:"usage"`
+}
+
+// AIComplete 使用目标系统的默认文本模型补全文本（应用拿不到模型地址与密钥，按应用计量与每日限额）。
+// 需要 platform.uses 包含 ai.complete；public 与 hook 入口不可用，单次执行受 backend.limits.timeout_ms 约束。
+func AIComplete(messages []AIMessage, options AICompleteOptions) (AICompletion, error) {
+	params := map[string]any{"messages": messages}
+	if options.System != "" {
+		params["system"] = options.System
+	}
+	if options.MaxOutput > 0 {
+		params["max_output"] = options.MaxOutput
+	}
+	if options.ResponseFormat != "" {
+		params["response_format"] = options.ResponseFormat
+	}
+	var out AICompletion
+	if err := PlatformCall("ai.complete", params, &out); err != nil {
+		return AICompletion{}, err
+	}
+	return out, nil
+}

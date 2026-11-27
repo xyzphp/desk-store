@@ -182,6 +182,23 @@ func (c *Context) SendFile(status int, virtualPath, contentType, downloadFilenam
 	c.written = true
 }
 
+// SendUserFile 指示宿主直接流式发送已被本应用登记引用的用户文件（fileID 为 file:<id>，需要 platform.uses 包含 files.reference）。
+// inline 为 true 时浏览器内联显示（HTML / SVG / 脚本类型仍由宿主强制下载）。
+func (c *Context) SendUserFile(status int, fileID string, inline bool) {
+	if status == 0 {
+		status = http.StatusOK
+	}
+	if inline {
+		c.SetHeader("content-disposition", "inline")
+	}
+	c.resp = ResponseEnvelope{
+		Status:   status,
+		Headers:  cloneMap(c.headers),
+		SendFile: fileID,
+	}
+	c.written = true
+}
+
 // Response 返回当前已构建的响应信封（未写出时默认 204）。
 func (c *Context) Response() ResponseEnvelope {
 	if !c.written {

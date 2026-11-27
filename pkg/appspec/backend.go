@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // 格式 2 的后端模块声明，合同见 docs/spec/02-backend.md 第 2 节。
@@ -32,6 +33,15 @@ type Backend struct {
 	Hooks     []BackendHook   `json:"hooks,omitempty"`
 	Schedules []Schedule      `json:"schedules,omitempty"`
 	Config    []ConfigItem    `json:"config,omitempty"`
+	// TokenScopes 声明个人令牌可授权的接口权限点；路由用 token_scope 引用后，令牌勾选对应权限点即可调用该 REST 路由。
+	TokenScopes []TokenScope `json:"token_scopes,omitempty"`
+}
+
+// TokenScope 是应用后端接口的个人令牌权限点（目标系统中的范围 ID 为 app-api:<slug>:<id>，默认不勾选）。
+type TokenScope struct {
+	ID          string `json:"id"`
+	Label       string `json:"label"`
+	Description string `json:"description,omitempty"`
 }
 
 // BackendLimits 调整单次执行的时长与内存。
@@ -46,6 +56,7 @@ type BackendRoute struct {
 	Methods    []string `json:"methods"`
 	Visibility string   `json:"visibility"`
 	RateLimit  string   `json:"rate_limit,omitempty"`
+	TokenScope string   `json:"token_scope,omitempty"`
 }
 
 // BackendStorage 声明使用的存储范围与配额（MB）。
@@ -154,6 +165,9 @@ func (m *Manifest) validateBackend(files []File) error {
 		}
 	}
 	if err := m.validateRoutes(); err != nil {
+		return err
+	}
+	if err := b.validateTokenScopes(); err != nil {
 		return err
 	}
 	if s := b.Storage; s != nil {
@@ -359,4 +373,47 @@ func minuteIntervalAtLeast(field string, gap int) bool {
 		return false
 	}
 	return first == previous || first+60-previous >= gap
+}
+
+// validateTokenScopes 校验个人令牌权限点：最多 16 个，ID 唯一，每个权限点至少被一条非 public 路由引用，路由只能引用已声明的权限点。
+func (b *Backend) validateTokenScopes() error {
+	if len(b.TokenScopes) > 16 {
+		return errors.New("backend.token_scopes 过多（上限 16）")
+	}
+	declared := map[string]bool{}
+	for _, scope := range b.TokenScopes {
+		if !backendNamePattern.MatchString(scope.ID) || declared[scope.ID] {
+			return fmt.Errorf("backend.token_scopes 中的 %q 无效或重复", scope.ID)
+		}
+		declared[scope.ID] = true
+		if strings.TrimSpace(scope.Label) == "" || len([]rune(scope.Label)) > 16 || containsControl(scope.Label) {
+			return fmt.Errorf("backend.token_scopes 中 %q 的 label 必须是 1-16 个字符", scope.ID)
+		}
+		if len([]rune(scope.Description)) > 120 || containsControl(scope.Description) {
+			return fmt.Errorf("backend.token_scopes 中 %q 的 description 不能超过 120 个字符", scope.ID)
+		}
+	}
+	used := map[string]bool{}
+	for i, route := range b.Routes {
+		if route.TokenScope == "" {
+			continue
+		}
+		if !declared[route.TokenScope] {
+			return fmt.Errorf("backend.routes 第 %d 项的 token_scope %q 没有在 backend.token_scopes 中声明", i+1, route.TokenScope)
+		}
+		if route.Visibility == "public" {
+			return fmt.Errorf("backend.routes 第 %d 项是 public 路由，不能声明 token_scope", i+1)
+		}
+		used[route.TokenScope] = true
+	}
+	for _, scope := range b.TokenScopes {
+		if !used[scope.ID] {
+			return fmt.Errorf("backend.token_scopes 中的 %q 没有被任何路由引用", scope.ID)
+		}
+	}
+	return nil
+}
+
+func containsControl(value string) bool {
+	return strings.ContainsFunc(value, unicode.IsControl)
 }

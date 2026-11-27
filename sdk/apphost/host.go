@@ -13,6 +13,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
@@ -65,6 +68,8 @@ type Host struct {
 	logs         []LogEntry
 	notices      []Notification
 	authorizedID map[int64]bool
+	refFiles     map[string]ReferencedFile
+	aiHandler    func(action string, params json.RawMessage) (json.RawMessage, error)
 
 	// 单次请求状态
 	curReq   appkit.RequestEnvelope
@@ -128,6 +133,27 @@ func WithDataDir(dir string) Option {
 	return func(h *Host) { h.dataDir = dir }
 }
 
+// ReferencedFile 是本地运行器中模拟的“已被应用登记引用的用户文件”（files.reference.read 与 send_file "file:<id>"）。
+type ReferencedFile struct {
+	Name      string
+	MediaType string
+	Data      []byte
+}
+
+// WithReferencedFiles 预置已登记引用的用户文件，键为 file:<id>。
+func WithReferencedFiles(files map[string]ReferencedFile) Option {
+	return func(h *Host) {
+		for id, file := range files {
+			h.refFiles[id] = file
+		}
+	}
+}
+
+// WithAI 模拟平台 AI 能力（ai.complete / ai.image）；未设置时返回固定示例结果。
+func WithAI(handler func(action string, params json.RawMessage) (json.RawMessage, error)) Option {
+	return func(h *Host) { h.aiHandler = handler }
+}
+
 func WithAuthorizedUsers(ids ...int64) Option {
 	return func(h *Host) {
 		for _, id := range ids {
@@ -163,6 +189,7 @@ func New(opts ...Option) *Host {
 		migrations:   map[string][]appliedMigration{},
 		kv:           map[string]map[string]kvEntry{},
 		authorizedID: map[int64]bool{},
+		refFiles:     map[string]ReferencedFile{},
 		memTxs:       map[string]*memTx{},
 		sqlTxs:       map[string]*sqlTx{},
 	}
@@ -972,6 +999,154 @@ func (h *Host) PlatformCall(payload []byte) ([]byte, error) {
 		h.notices = append(h.notices, Notification{UserID: targetID, Title: p.Title, Body: p.Body})
 		h.mu.Unlock()
 		return []byte(`{"ok":true}`), nil
+
+	case "files.reference.add", "files.reference.remove":
+		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "files.reference")) {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "files.reference not declared"}
+		}
+		if h.curReq.Context.User == nil {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "no authenticated user"}
+		}
+		return []byte(`{"ok":true}`), nil
+
+	case "files.reference.read":
+		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "files.reference")) {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "files.reference not declared"}
+		}
+		var p struct {
+			FileID   string `json:"file_id"`
+			MetaOnly bool   `json:"meta_only"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil || !strings.HasPrefix(p.FileID, "file:") {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "invalid files.reference.read params"}
+		}
+		h.mu.Lock()
+		file, ok := h.refFiles[p.FileID]
+		h.mu.Unlock()
+		if !ok {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeNotFound, Message: "file not found or not referenced by this app"}
+		}
+		if len(file.Data) > 4<<20 && !p.MetaOnly {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeLimit, Message: "file exceeds 4 MB; respond with send_file instead"}
+		}
+		out := map[string]any{"file_id": p.FileID, "name": file.Name, "media_type": file.MediaType, "size": len(file.Data)}
+		if !p.MetaOnly {
+			out["data_b64"] = base64.StdEncoding.EncodeToString(file.Data)
+		}
+		return json.Marshal(out)
+
+	case "files.reference.list":
+		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "files.reference")) {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "files.reference not declared"}
+		}
+		return []byte(`{"items":[]}`), nil
+
+	case "ai.complete":
+		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "ai.complete")) {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "ai.complete not declared"}
+		}
+		if entry := h.curReq.Context.Entry; entry == "public" || entry == "hook" {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "ai.complete not allowed on public or hook entry"}
+		}
+		var p struct {
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil || len(p.Messages) == 0 || p.Messages[len(p.Messages)-1].Role != "user" {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "invalid ai.complete params"}
+		}
+		if h.aiHandler != nil {
+			out, err := h.aiHandler(req.Action, req.Params)
+			if err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeErr, Message: err.Error()}
+			}
+			return out, nil
+		}
+		return json.Marshal(map[string]any{"text": "（本地模拟）" + p.Messages[len(p.Messages)-1].Content, "model": "local",
+			"usage": map[string]int{"input_tokens": 0, "output_tokens": 0}})
+
+	case "ai.image":
+		return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "ai.image is only available from app pages (XYZOSSDK.platform.ai.image)"}
+
+	case "image.sanitize":
+		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "image.sanitize")) {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "image.sanitize not declared"}
+		}
+		if h.curReq.Context.Entry == "public" {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "image.sanitize forbidden on public entry"}
+		}
+		var p struct {
+			SourcePath string `json:"source_path"`
+			DestPath   string `json:"dest_path"`
+			DataB64    string `json:"data_b64"`
+			Format     string `json:"format"`
+			Quality    int    `json:"quality"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil || strings.TrimSpace(p.DestPath) == "" {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "invalid image.sanitize params"}
+		}
+		var raw []byte
+		if p.DataB64 != "" {
+			dec, err := base64.StdEncoding.DecodeString(strings.TrimSpace(p.DataB64))
+			if err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "invalid base64"}
+			}
+			raw = dec
+		} else if p.SourcePath != "" && h.dataDir != "" {
+			rel := strings.TrimPrefix(filepath.Clean(p.SourcePath), "/data/")
+			b, err := os.ReadFile(filepath.Join(h.dataDir, filepath.FromSlash(rel)))
+			if err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeNotFound, Message: "source not found"}
+			}
+			raw = b
+		} else {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "source_path or data_b64 required"}
+		}
+		img, fmtName, err := image.Decode(bytes.NewReader(raw))
+		if err != nil || (fmtName != "png" && fmtName != "jpeg") {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "only png/jpeg supported"}
+		}
+		outFmt := strings.ToLower(strings.TrimSpace(p.Format))
+		if outFmt == "" {
+			outFmt = fmtName
+		}
+		var buf bytes.Buffer
+		mediaType := "image/png"
+		if outFmt == "jpeg" || outFmt == "jpg" {
+			q := p.Quality
+			if q <= 0 || q > 100 {
+				q = 85
+			}
+			if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: q}); err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeErr, Message: err.Error()}
+			}
+			mediaType = "image/jpeg"
+		} else {
+			if err := png.Encode(&buf, img); err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeErr, Message: err.Error()}
+			}
+		}
+		if h.dataDir != "" {
+			rel := strings.TrimPrefix(filepath.Clean(p.DestPath), "/data/")
+			dst := filepath.Join(h.dataDir, filepath.FromSlash(rel))
+			_ = os.MkdirAll(filepath.Dir(dst), 0o755)
+			if err := os.WriteFile(dst, buf.Bytes(), 0o600); err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeErr, Message: err.Error()}
+			}
+		}
+		sum := sha256.Sum256(buf.Bytes())
+		bounds := img.Bounds()
+		out, _ := json.Marshal(appkit.SanitizedImage{
+			Path:      p.DestPath,
+			MediaType: mediaType,
+			Width:     bounds.Dx(),
+			Height:    bounds.Dy(),
+			Size:      buf.Len(),
+			SHA256:    hex.EncodeToString(sum[:]),
+		})
+		return out, nil
 
 	default:
 		return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "unknown platform action"}

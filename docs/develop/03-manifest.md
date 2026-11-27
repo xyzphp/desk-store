@@ -14,7 +14,7 @@
 | `entry` | 二选一 | 包根目录的 `.html` 文件 |
 | `gateway_page` | 二选一 | `{ "proxy": "<key>", "path": "/portal/" }`，由系统代理加载上游页面，见[沙箱与桥接](04-bridge.md#上游页面) |
 | `icon` | 是 | 包根目录的 SVG / PNG / JPEG / WebP，≤ 64 KB |
-| `window` | 否 | `{ "width": 900, "height": 620 }`，宽 320–3840，高 240–2160 |
+| `window` | 否 | `{ "width": 900, "height": 620 }`，宽 320–3840，高 240–2160；可选 `min_width`（320 至 `width`）与 `min_height`（240 至 `height`）限制窗口最小尺寸，声明后生成能力标记 `window.min_size`，不支持的系统显示“当前系统不支持” |
 | `gateway_api` | 否 | 最多 8 个系统接口路径前缀，必须以 `/xyzos/api/` 开头，见[沙箱与桥接](04-bridge.md#调用系统接口) |
 | `permissions` | 否 | 最多 16 个，当前只支持 `proxy.<key>`，每个都必须有对应的代理 |
 | `proxies` | 否 | 最多 8 个代理声明，见下文 |

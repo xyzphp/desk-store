@@ -14,6 +14,7 @@ const (
 	CapabilityWidget          = "widget"
 	CapabilityAccountSelector = "widget.account_selector"
 	CapabilityWindow          = "window"
+	CapabilityWindowMinSize   = "window.min_size"
 )
 
 // Summary 是从清单提取、供展示与评审的权限摘要。
@@ -87,6 +88,9 @@ func (m Manifest) Capabilities() []string {
 	}
 	if m.Window != nil {
 		capabilities = append(capabilities, CapabilityWindow)
+		if m.Window.MinWidth > 0 || m.Window.MinHeight > 0 {
+			capabilities = append(capabilities, CapabilityWindowMinSize)
+		}
 	}
 	capabilities = append(capabilities, m.formatTwoCapabilities()...)
 	sort.Strings(capabilities)

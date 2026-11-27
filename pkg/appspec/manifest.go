@@ -97,10 +97,12 @@ type GatewayPage struct {
 	Path  string `json:"path"`
 }
 
-// WindowSize 是应用窗口的初始尺寸。
+// WindowSize 是应用窗口的初始尺寸与可选的最小尺寸（0 表示不限制）。
 type WindowSize struct {
-	Width  int `json:"width"`
-	Height int `json:"height"`
+	Width     int `json:"width"`
+	Height    int `json:"height"`
+	MinWidth  int `json:"min_width,omitempty"`
+	MinHeight int `json:"min_height,omitempty"`
 }
 
 // Proxy 是一条受控接口代理声明。
@@ -215,6 +217,9 @@ func (m *Manifest) validate(files []File) error {
 	}
 	if m.Window != nil && (m.Window.Width < 320 || m.Window.Width > 3840 || m.Window.Height < 240 || m.Window.Height > 2160) {
 		return errors.New("manifest 的 window 尺寸无效（宽 320-3840，高 240-2160）")
+	}
+	if w := m.Window; w != nil && (w.MinWidth != 0 && (w.MinWidth < 320 || w.MinWidth > w.Width) || w.MinHeight != 0 && (w.MinHeight < 240 || w.MinHeight > w.Height)) {
+		return errors.New("manifest 的 window 最小尺寸无效（min_width 320 至 width，min_height 240 至 height）")
 	}
 	entryFound, iconFound := m.Entry == "", false
 	for _, file := range files {
