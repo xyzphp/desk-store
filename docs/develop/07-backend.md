@@ -116,6 +116,7 @@ func main() {}
 | 系统 API（以调用者身份） | `appkit.APICall(...)` | `gateway_api`（仅已认证调用者） |
 | 平台能力 | `appkit.SettingsGet` / `IdentityMe` / `NotifySend` | `platform.uses` 或 `provides.settings` |
 | 读取已引用的用户文件 | `appkit.FileReferenceRead(fileID, metaOnly)`（≤ 4 MB）、`c.SendUserFile(200, fileID, inline)`（流式） | `platform.uses: ["files.reference"]` |
+| 保存新文件到用户的文件管理 | `appkit.FileSave(name, sourcePath, data, refKey)`；页面 `XYZOSSDK.platform.files.save({ file, refKey })` | `platform.uses: ["files.save"]`（登记引用另需 `files.reference`） |
 | AI 文本补全 | `appkit.AIComplete(messages, options)`（使用目标系统的默认文本模型，按应用计量与每日限额；`public` / `hook` 入口不可用）；生图只能在页面调用 `XYZOSSDK.platform.ai.image` | `platform.uses: ["ai.complete"]` / `["ai.image"]` |
 | 个人令牌接口 | 路由加 `token_scope`，入口 `c.Entry() == "token"` | `backend.token_scopes` |
 | 公开回调 | `r.HandleHook("POST", "payment", fn)` | `backend.hooks` |

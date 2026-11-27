@@ -217,3 +217,39 @@ func TestHostReferencedFilesAndAIComplete(t *testing.T) {
 		t.Fatalf("completion: %+v", completion)
 	}
 }
+
+func TestHostFileSave(t *testing.T) {
+	manifest := &appspec.Manifest{
+		Format: 2, Slug: "save-demo", Version: "1.0.0",
+		Platform: &appspec.Platform{Uses: []string{"files.save", "files.reference"}},
+		Backend:  &appspec.Backend{Runtime: "wasm", ABI: 1, Module: "backend/app.wasm"},
+	}
+	host := apphost.New(apphost.WithManifest(manifest))
+	defer host.Close()
+	var saved appkit.SavedFile
+	var read appkit.ReferencedFile
+	var anonErr error
+	handler := appkit.HandlerFunc(func(c *appkit.Context) {
+		var err error
+		if c.Request.Context.User == nil {
+			_, anonErr = appkit.FileSave("a.txt", "", []byte("x"), "")
+			c.JSON(http.StatusOK, nil)
+			return
+		}
+		if saved, err = appkit.FileSave("note.txt", "", []byte("hello"), "article-1"); err != nil {
+			c.Error(http.StatusInternalServerError, err.Error())
+			return
+		}
+		read, _ = appkit.FileReferenceRead(saved.FileID, false)
+		c.JSON(http.StatusOK, nil)
+	})
+	if _, err := host.Do(appkit.RequestEnvelope{Method: http.MethodPost, Path: "/x", Context: appkit.RequestContext{User: &appkit.User{ID: 1}}}, handler); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(saved.FileID, "file:") || saved.RefKey != "article-1" || read.Name != "note.txt" {
+		t.Fatalf("saved=%+v read=%+v", saved, read)
+	}
+	if _, err := host.Do(appkit.RequestEnvelope{Method: http.MethodPost, Path: "/x"}, handler); err != nil || !appkit.IsCode(anonErr, appkit.CodeDenied) {
+		t.Fatalf("anonymous save must be denied: %v %v", err, anonErr)
+	}
+}

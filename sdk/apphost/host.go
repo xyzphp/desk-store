@@ -16,6 +16,7 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
@@ -69,6 +70,7 @@ type Host struct {
 	notices      []Notification
 	authorizedID map[int64]bool
 	refFiles     map[string]ReferencedFile
+	savedSeq     int
 	aiHandler    func(action string, params json.RawMessage) (json.RawMessage, error)
 
 	// 单次请求状态
@@ -1040,6 +1042,44 @@ func (h *Host) PlatformCall(payload []byte) ([]byte, error) {
 			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "files.reference not declared"}
 		}
 		return []byte(`{"items":[]}`), nil
+
+	case "files.save":
+		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "files.save")) {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "files.save not declared"}
+		}
+		if h.curReq.Context.User == nil || h.curReq.Context.Entry == "public" {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeDenied, Message: "files.save requires an authenticated caller"}
+		}
+		var p struct {
+			Name       string `json:"name"`
+			SourcePath string `json:"source_path"`
+			DataB64    string `json:"data_b64"`
+			RefKey     string `json:"ref_key"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil || strings.TrimSpace(p.Name) == "" || (p.SourcePath == "") == (p.DataB64 == "") {
+			return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "invalid files.save params"}
+		}
+		var data []byte
+		if p.DataB64 != "" {
+			decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(p.DataB64))
+			if err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeInvalid, Message: "invalid base64"}
+			}
+			data = decoded
+		} else if h.dataDir != "" {
+			rel := strings.TrimPrefix(filepath.Clean(p.SourcePath), "/data/")
+			b, err := os.ReadFile(filepath.Join(h.dataDir, filepath.FromSlash(rel)))
+			if err != nil {
+				return nil, &appkit.HostError{Op: "platform_call", Code: appkit.CodeNotFound, Message: "source not found"}
+			}
+			data = b
+		}
+		h.mu.Lock()
+		h.savedSeq++
+		id := fmt.Sprintf("file:%d", 900000+h.savedSeq)
+		h.refFiles[id] = ReferencedFile{Name: p.Name, MediaType: http.DetectContentType(data), Data: data}
+		h.mu.Unlock()
+		return json.Marshal(map[string]any{"file_id": id, "name": p.Name, "media_type": http.DetectContentType(data), "size": len(data), "ref_key": p.RefKey})
 
 	case "ai.complete":
 		if h.manifest != nil && (h.manifest.Platform == nil || !slices.Contains(h.manifest.Platform.Uses, "ai.complete")) {

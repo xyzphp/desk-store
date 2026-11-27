@@ -46,6 +46,7 @@
 | `directory.pick` / `pick` | `{ multiple? }` | 系统选人窗口，返回选中成员 `[{ id, displayName }]`，取消为 `null`；只能选到能使用本应用的成员 |
 | `files.pick` / `pick` | — | 系统文件选择窗口，返回 `{ fileId, name, mediaType, size, url, expiresAt }`，取消为 `null` |
 | `files.reference` / `add`、`remove`、`list` | `add`/`remove`: `{ fileId, refKey? }` | 登记、解除或查询应用对已选管理文件的引用；被引用文件禁止回收或删除，应用卸载时自动释放 |
+| `files.save` / `save` | `{ name, file? \| dataBase64?, refKey? }` | 把新文件保存到**调用者本人**的文件管理根目录（需调用者有文件管理权限，≤ 20 MB；规则同文件管理上传：PNG / JPEG 校验并重新编码、配额、默认存储位置），同名时自动改为 `名称 (2).ext`；SDK 接受 `Blob` / `File` 并自动转成 Base64。返回 `{ fileId, name, mediaType, size, width?, height?, refKey? }`；`refKey` 非空且声明了 `files.reference` 时同时登记引用 |
 | `image.sanitize` / `sanitize` | `{ fileId?, dataBase64?, format?, quality?, destPath? }` | 仅接受 PNG / JPEG 并重新编码清洗；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size, sha256 }`，否则返回 `dataBase64` |
 | `ai.complete` / `complete` | `{ system?, messages: [{ role, content }], maxOutput?, responseFormat? }` | 用目标系统的默认文本模型补全文本，返回 `{ text, model, usage: { inputTokens, outputTokens } }`；`role` 只能是 `user` / `assistant` 且最后一条为 `user`，最多 40 条、合计 ≤ 100000 字，`system` ≤ 8000 字，`responseFormat` 为 `text` / `json`；应用拿不到模型地址与密钥，按应用每日计量，超出管理员设定的上限返回 429，上限为 0 时返回 403 |
 | `ai.image` / `generate` | `{ prompt, size?, quality?, destPath? }` | 生成一张 PNG：`prompt` ≤ 4000 字，`size` 为 `auto` 或 `宽x高` 比例（1:3–3:1），`quality` 为 `auto` / `low` / `medium` / `high`；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size }`，否则返回 `dataBase64`；需目标系统已开启生图，计量与限额同上 |

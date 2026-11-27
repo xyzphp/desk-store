@@ -389,3 +389,35 @@ func AIComplete(messages []AIMessage, options AICompleteOptions) (AICompletion, 
 	}
 	return out, nil
 }
+
+// SavedFile 是 platform_call("files.save") 的返回：保存到调用者文件管理的新文件。
+type SavedFile struct {
+	FileID    string `json:"file_id"`
+	Name      string `json:"name"`
+	MediaType string `json:"media_type"`
+	Size      int64  `json:"size"`
+	Width     int    `json:"width,omitempty"`
+	Height    int    `json:"height,omitempty"`
+	RefKey    string `json:"ref_key,omitempty"`
+}
+
+// FileSave 把新文件保存到调用者本人的文件管理（需要 platform.uses 包含 files.save，且有登录调用者）。
+// sourcePath 指向应用自己的 /data 文件，或用 data 直接传内容（受 64 KB 调用载荷限制，较大的文件请先写入应用存储）；
+// refKey 非空且声明了 files.reference 时同时登记引用。同名时目标系统自动改名，文件 ≤ 20 MB。
+func FileSave(name, sourcePath string, data []byte, refKey string) (SavedFile, error) {
+	params := map[string]any{"name": name}
+	if sourcePath != "" {
+		params["source_path"] = sourcePath
+	}
+	if len(data) > 0 {
+		params["data_b64"] = base64.StdEncoding.EncodeToString(data)
+	}
+	if refKey != "" {
+		params["ref_key"] = refKey
+	}
+	var out SavedFile
+	if err := PlatformCall("files.save", params, &out); err != nil {
+		return SavedFile{}, err
+	}
+	return out, nil
+}
