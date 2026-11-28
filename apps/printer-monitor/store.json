@@ -1,0 +1,8 @@
+{
+  "summary": "查看 3D 打印机实时状态、打印进度、温度与摄像头画面，支持桌面卡片",
+  "category": "monitoring",
+  "tags": ["监控", "3D打印", "桌面卡片"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/desk-store"
+}

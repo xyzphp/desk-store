@@ -126,6 +126,12 @@ export function inHostFrame(): boolean {
   return host !== null;
 }
 
+export function requestInitIfNeeded(): void {
+  if (host && !context) {
+    void call('ready').catch(() => undefined);
+  }
+}
+
 export function currentContext(): InitContext | null {
   return context;
 }
@@ -303,8 +309,26 @@ export async function platformFilesSave(
 export const platformSettingsGet = (signal?: AbortSignal) =>
   platformCall('settings', 'get', undefined, signal) as Promise<Record<string, unknown>>;
 
+export interface PlatformAIModelOption {
+  id: string;
+  name: string;
+  imageEnabled: boolean;
+}
+
+export interface PlatformAIModelsResult {
+  ok?: boolean;
+  models?: PlatformAIModelOption[];
+  defaultModelId?: string;
+  textEnabled?: boolean;
+  imageEnabled?: boolean;
+}
+
+export const platformAIModels = (signal?: AbortSignal) =>
+  platformCall('ai.models', 'list', undefined, signal) as Promise<PlatformAIModelsResult>;
+
 export const platformAIComplete = (
   payload: {
+    modelId?: string;
     system?: string;
     messages: Array<{ role: 'user' | 'assistant'; content: string }>;
     maxOutput?: number;
@@ -320,6 +344,7 @@ export const platformAIComplete = (
 
 export const platformAIImage = (
   payload: {
+    modelId?: string;
     prompt: string;
     size?: string;
     quality?: string;

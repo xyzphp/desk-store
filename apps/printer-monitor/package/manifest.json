@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "slug": "printer-monitor",
+  "name": "3d打印监控",
+  "version": "1.1.1",
+  "description": "查看拓竹打印状态、进度和打印中画面，支持桌面状态卡片与系统显示开关。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "desktop_widget": true,
+  "window": {
+    "width": 1040,
+    "height": 840
+  },
+  "permissions": ["proxy.monitor"],
+  "proxies": [
+    {
+      "key": "monitor",
+      "title": "打印监控 Go 服务",
+      "upstream": "http://printer-monitor.example.com:8090",
+      "base_url_editable": true,
+      "auth_type": "none",
+      "paths": ["/api/printer", "/api/camera/frame", "/healthz"],
+      "methods": ["GET"],
+      "pass_query": false,
+      "timeout_ms": 25000,
+      "max_response_bytes": 1048576
+    }
+  ]
+}

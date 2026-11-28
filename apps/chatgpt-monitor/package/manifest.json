@@ -1,0 +1,58 @@
+{
+  "format": 1,
+  "slug": "chatgpt-monitor",
+  "name": "GPT 监控",
+  "version": "1.7.0",
+  "description": "ChatGPT 多账号用量监控：桌面卡片支持独立选择账号，应用窗口通过标准代理桥读取、切换和管理各账号，凭据只在网关与上游服务端处理。",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "desktop_widget": true,
+  "widget": {
+    "title": "ChatGPT 账号额度",
+    "proxy": "monitor",
+    "path": "/api/usage",
+    "refresh_seconds": 300,
+    "updated_path": "fetched_at",
+    "metrics": [
+      {
+        "label": "5 小时剩余",
+        "value_path": "five_hour.used_percent",
+        "reset_path": "five_hour.reset_at",
+        "invert": true
+      },
+      {
+        "label": "本周剩余",
+        "value_path": "seven_day.used_percent",
+        "reset_path": "seven_day.reset_at",
+        "invert": true
+      }
+    ],
+    "account_selector": {
+      "path": "/api/accounts",
+      "items_path": "accounts",
+      "id_path": "id",
+      "label_path": "name",
+      "default_path": "primary_account_id",
+      "query_param": "account_id"
+    }
+  },
+  "window": {
+    "width": 1400,
+    "height": 800
+  },
+  "permissions": ["proxy.monitor"],
+  "proxies": [
+    {
+      "key": "monitor",
+      "title": "ChatGPT 监控服务",
+      "upstream": "https://chatgpt-monitor.example.com",
+      "base_url_editable": true,
+      "auth_type": "basic",
+      "paths": ["/api/", "/healthz", "/openapi.yaml"],
+      "methods": ["GET", "HEAD", "POST", "PUT", "DELETE"],
+      "pass_query": true,
+      "timeout_ms": 30000,
+      "max_response_bytes": 1048576
+    }
+  ]
+}

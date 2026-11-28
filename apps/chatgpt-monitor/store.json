@@ -1,0 +1,8 @@
+{
+  "summary": "ChatGPT 多账号用量监控，支持桌面额度卡片与账号切换、设置及接口调试",
+  "category": "monitoring",
+  "tags": ["监控", "桌面卡片", "ChatGPT"],
+  "authors": [{ "name": "Desk Store", "url": "https://github.com/xyzphp/desk-store" }],
+  "license": "MIT",
+  "repository": "https://github.com/xyzphp/codexMeter"
+}

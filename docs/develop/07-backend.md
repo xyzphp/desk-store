@@ -1,34 +1,14 @@
-# 后端模块开发指南（ABI 1）
+# 后端开发
 
-格式 2 应用可以携带一个编译为 WebAssembly（WASI preview 1 reactor）的 Go 后端模块，由目标系统按请求实例化执行，并按清单声明提供隔离数据库、文件目录、安装配置、外部 HTTP、代理、系统接口、平台能力、公开回调与定时任务。
+格式 2 应用可携带编译为 WebAssembly（WASI preview 1 reactor）的 Go 后端模块（ABI 1）。目标系统按请求实例化执行，按清单白名单提供隔离 SQLite、受限文件目录、安装配置、外部 HTTP、代理、平台能力、个人令牌 API、公开回调与定时任务。
 
-完整协议定义见 [后端模块、存储与数据库迁移](../spec/02-backend.md)。
+完整底层协议见 [后端模块、存储与数据库迁移规范](../spec/02-backend.md)。
+
+> **无状态执行模型**：每次请求独立实例化、结束后销毁，请求间不共享内存；持久状态必须写入 `db_call`、`kv_call` 或 `/data` 受限目录。
 
 ## 1. 目录结构与 `build.json`
 
-后端源码存放在应用目录下的 `backend/`，是一个独立的 Go 模块，并在应用根目录声明 `build.json`：
-
-```text
-apps/<slug>/
-  build.json
-  store.json
-  README.md
-  CHANGELOG.md
-  backend/
-    go.mod
-    main.go
-    main_test.go
-  package/
-    manifest.json
-    icon.svg
-    index.html
-    backend/
-      migrations/
-        shared/0001_init.sql
-        account/0001_init.sql
-```
-
-`build.json`：
+后端是位于 `apps/<slug>/backend/` 的独立 Go 模块，根目录配置 `build.json`：
 
 ```json
 {
@@ -36,14 +16,14 @@ apps/<slug>/
 }
 ```
 
-仓库中**不得提交**预编译的 `package/backend/app.wasm`；执行 `appcheck check` / `pack` / `build` 时会自动以固定参数从 `backend/` 构建：
+禁止提交预编译的 `package/backend/app.wasm`。`appcheck` 与 CI 以固定参数编译：
 
 ```sh
 GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 GOFLAGS=-mod=readonly \
   go build -buildmode=c-shared -trimpath -buildvcs=false -ldflags=-buildid= -o app.wasm .
 ```
 
-在商店仓库内开发示例应用时，`backend/go.mod` 可通过本地相对 `replace` 引用仓库自带的 SDK（无需外网拉取依赖）：
+在仓库内开发时，可在 `backend/go.mod` 使用相对路径引用内置 SDK：
 
 ```text
 module example.com/my-app/backend
@@ -57,9 +37,7 @@ replace github.com/xyzphp/desk-store => ../../..
 
 ## 2. 使用 Go SDK（`sdk/appkit`）
 
-`github.com/xyzphp/desk-store/sdk/appkit` 封装了全部 ABI 1 宿主能力，且按能力拆分为独立函数——**未调用的宿主能力不会被编译进 Wasm 导入表**，因此不会触发“导入了清单未声明的能力”校验失败。
-
-最小后端入口：
+`github.com/xyzphp/desk-store/sdk/appkit` 按能力拆分宿主绑定，**未调用的函数不会进入 Wasm 导入表**：
 
 ```go
 package main
@@ -101,41 +79,74 @@ func handle() int32 {
 func main() {}
 ```
 
-### 常用能力速查
+单请求默认超时 `5` 秒、内存 `64 MB`、并发 `8`、请求与响应信封各 `1 MB`；可在 `backend.limits` 中将超时最高设至 `30000 ms`、内存最高设至 `256 MB`。
 
-| 能力 | SDK 调用 | 需要的清单声明 |
+## 3. 路由、审计日志与个人令牌
+
+在 `backend.routes` 声明全部接口（≤ 64 条）：
+
+```json
+{
+  "backend": {
+    "runtime": "wasm",
+    "abi": 1,
+    "module": "backend/app.wasm",
+    "token_scopes": [
+      { "id": "read", "label": "读取", "description": "读取列表与详情" },
+      { "id": "write", "label": "写入", "description": "创建或修改数据" }
+    ],
+    "routes": [
+      { "path": "/items", "methods": ["GET"], "visibility": "app", "token_scope": "read" },
+      {
+        "path": "/items",
+        "methods": ["POST"],
+        "visibility": "permission:item.write",
+        "token_scope": "write",
+        "audit": { "action": "create_item", "label": "新建记录" }
+      },
+      { "path": "/me/prefs", "methods": ["PUT"], "visibility": "app", "audit": { "mode": "off" } },
+      { "path": "/public/items", "methods": ["GET"], "visibility": "public", "rate_limit": "60/min" }
+    ]
+  }
+}
+```
+
+- **可见性（`visibility`）**：`public`（匿名只读 `public` 存储）、`signed_in`（任意登录用户）、`app`（获授本应用用户）、`permission:<name>`（需指定应用内子权限）；
+- **操作日志（`audit`）**：默认（或 `mode: "write"`）自动记录已认证写操作（建议填写固定 `action` 与 `label`）；`mode: "all"` 全量入账（禁止用于 `public`）；`mode: "off"` 关闭入账且不能写 `action` / `label`；
+- **个人令牌（`token_scopes`）**：最多 16 项，非公开路由绑定 `token_scope` 后支持 `Authorization: Bearer` 访问（`c.Entry() == "token"`），仍强制校验账号实时权限并禁用 `api_call`。
+
+## 4. 三类隔离存储与数据库迁移
+
+| 范围 | SQLite 数据库 | 文件目录 | 边界说明 |
+| --- | --- | --- | --- |
+| `shared` | 共享库 | `/data/shared` | 授权用户经后端访问，由后端按 `c.Permissions()` 鉴权 |
+| `public` | 公开库 | `/data/public` | 后端可读写；`public` 路由与入口严格只读 |
+| `account` | 每账号独立库 | `/data/me` | 宿主自动只打开当前登录账号自己的库与目录 |
+
+- 表结构变更全部通过 `package/backend/migrations/<scope>/NNNN_<名称>.sql` 完成（四位编号从 `0001` 严格递增）；
+- 运行时 `db_call` 禁止 DDL、`ATTACH`、`VACUUM`、`PRAGMA` 及访问保留表 `_app_migrations` / `_app_kv`；
+- **已发布迁移不可修改、删除或重编号**，仅可向后追加；如需代码级数据转换，可导出可选入口 `migrate() -> i32` 并调用 `appkit.DispatchMigrate`；
+- 大文件上传通过 `backendUpload` + `c.ParseUpload()`，大文件输出通过 `c.SendFile(...)` / `c.SendUserFile(...)`，详见 [文件与媒体](../platform/02-files-and-media.md)。
+
+## 5. SDK 能力速查
+
+| 能力 | `sdk/appkit` 调用 | 所需清单声明 |
 | --- | --- | --- |
-| 数据库（`database/sql`） | `appkit.OpenDB("shared" \| "public" \| "account")` | `backend.storage` 对应范围 |
-| 轻量数据库 / 事务 | `appkit.DB(scope).Query / Exec / Begin` | `backend.storage` 对应范围 |
-| 键值存储（KV） | `appkit.KV(scope).Get / Set / Delete / List` | `backend.storage` 对应范围 |
-| 受限文件与直传 | `os.Open(appkit.DataPath("shared", "a.txt"))`、`c.ParseUpload()`、`c.SendFile(...)` | `backend.storage` 对应范围 |
-| 安装配置 | `appkit.Config("key")` | `backend.config` |
-| 日志 | `appkit.LogDebug / LogInfo / LogWarn / LogError` | 无 |
+| SQLite / 事务 | `appkit.OpenDB(scope)` / `appkit.DB(scope)` | `backend.storage` |
+| 键值存储（KV） | `appkit.KV(scope).Get / Set / Delete / List` | `backend.storage` |
+| 受限文件与直传 | `appkit.DataPath`、`c.ParseUpload()`、`c.SendFile(...)` | `backend.storage` |
+| 安装配置与密钥 | `appkit.Config("key")` | `backend.config` |
+| 应用日志 | `appkit.LogDebug / LogInfo / LogWarn / LogError` | 无 |
 | 外部 HTTP | `appkit.HTTPFetch(...)` / `appkit.NewHTTPClient()` | `backend.http.allow` |
-| 声明式代理 | `appkit.ProxyFetch(...)` | `proxies` |
-| 系统 API（以调用者身份） | `appkit.APICall(...)` | `gateway_api`（仅已认证调用者） |
-| 平台能力 | `appkit.SettingsGet` / `IdentityMe` / `NotifySend` | `platform.uses` 或 `provides.settings` |
-| 读取已引用的用户文件 | `appkit.FileReferenceRead(fileID, metaOnly)`（≤ 4 MB）、`c.SendUserFile(200, fileID, inline)`（流式） | `platform.uses: ["files.reference"]` |
-| 保存新文件到用户的文件管理 | `appkit.FileSave(name, sourcePath, data, refKey)`；页面 `XYZOSSDK.platform.files.save({ file, refKey })` | `platform.uses: ["files.save"]`（登记引用另需 `files.reference`） |
-| AI 文本补全 | `appkit.AIComplete(messages, options)`（使用目标系统的默认文本模型，按应用计量与每日限额；`public` / `hook` 入口不可用）；生图只能在页面调用 `XYZOSSDK.platform.ai.image` | `platform.uses: ["ai.complete"]` / `["ai.image"]` |
-| 个人令牌接口 | 路由加 `token_scope`，入口 `c.Entry() == "token"` | `backend.token_scopes` |
-| 公开回调 | `r.HandleHook("POST", "payment", fn)` | `backend.hooks` |
-| 定时任务 | `r.HandleSchedule("/jobs/daily", fn)` | `backend.schedules` + `POST` 路由 |
-| 迁移数据钩子 | `//go:wasmexport migrate` + `appkit.DispatchMigrate(fn)` | 可选导出 |
+| 声明式代理 / 系统 API | `appkit.ProxyFetch(...)` / `appkit.APICall(...)` | `proxies` / `gateway_api` |
+| 平台设置 / 身份 / 通知 | `appkit.SettingsGet` / `IdentityMe` / `NotifySend` | `platform.uses` 或 `provides.settings` |
+| 引用 / 保存用户文件 | `appkit.FileReferenceRead`、`c.SendUserFile`、`appkit.FileSave` | `platform.uses`（`files.*`） |
+| AI 文本补全 | `appkit.AIComplete(messages, options)`（`public` / `hook` 禁用） | `platform.uses: ["ai.complete"]` |
+| 公开回调 / 定时任务 | `r.HandleHook(...)` / `r.HandleSchedule(...)` | `backend.hooks` / `backend.schedules` |
 
-## 3. 数据库迁移
+## 6. 本地单元测试（`sdk/apphost`）
 
-表结构变更全部通过 `package/backend/migrations/<scope>/NNNN_<名称>.sql` 完成：
-
-- `scope` 必须在 `backend.storage` 中启用（`shared`、`public` 或 `account`）；
-- 文件编号从 `0001` 开始严格连续递增，名称仅含小写字母、数字与连字符；
-- 已发布的迁移文件**不可修改、不可删除、不可重编号**，只能追加新文件；
-- 运行时 `db_call` 禁止执行 DDL、`ATTACH`、`VACUUM`、`PRAGMA` 或读写 `_app_migrations` / `_app_kv`；
-- 需要在 SQL 迁移后做代码级数据转换时，导出 `migrate() -> i32` 并在其中调用 `appkit.DispatchMigrate`。
-
-## 4. 本地测试（`sdk/apphost`）与 `appcheck`
-
-在 `backend/main_test.go` 中使用 `github.com/xyzphp/desk-store/sdk/apphost`，无需编译 Wasm 即可在本机执行迁移并测试路由、权限、事务与外部能力桩：
+使用 `github.com/xyzphp/desk-store/sdk/apphost` 可直接在宿主 Go 环境运行迁移并测试路由、权限隔离与能力替身，无需编译 Wasm：
 
 ```go
 host, err := apphost.NewFromAppDir("..",
@@ -152,11 +163,3 @@ resp, err := host.Do(appkit.RequestEnvelope{
 	Context: appkit.RequestContext{User: &appkit.User{ID: 1, DisplayName: "Alice"}},
 }, buildRouter())
 ```
-
-提交前在商店根目录运行校验：
-
-```sh
-go run ./cmd/appcheck check apps/<slug>
-```
-
-`appcheck check` 会依次构建 Wasm、校验清单与迁移文件、并静态检查 Wasm 导出与 `host.*` 导入是否与清单完全一致。

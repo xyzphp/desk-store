@@ -52,10 +52,10 @@
 | --- | --- |
 | `access` | `{ "permissions": [{ "name", "title" }], "defaultGrant": "none" }` |
 | `surfaces` | `{ "standalone": true, "public": { "alias": "/articles", "session": "optional" } }` |
-| `backend` | `{ "routes": [{ "path", "methods", "visibility" }], "storage": { "shared": true, "public": true, "account": false }, "http": ["api.example.com"], "hooks": ["payment"], "schedules": ["daily-digest"], "config": [{ "key", "title", "secret" }] }` |
+| `backend` | `{ "routes": [{ "path", "methods", "visibility", "audit"?: { "mode"?, "action"?, "label"? } }], "storage": { "shared": true, "public": true, "account": false }, "http": ["api.example.com"], "hooks": ["payment"], "schedules": ["daily-digest"], "config": [{ "key", "title", "secret" }] }` |
 | `platform` | `{ "uses": [...], "provides": [...] }` |
 | `mcp` | `{ "tools": [{ "name", "title", "description", "readOnly", "destructive", "kind": "backend | declarative | remote" }], "resources": [...], "prompts": [...], "remote": { "proxy", "pinnedTools" } }` |
-| `skills` | `[{ "name", "description" }]` |
+| `skills` | `[{ "name", "description", "tools": [...], "files": [{ "path", "size", "content" }] }]`（`tools`、`files` 可选，`files` 含 `SKILL.md` 与 `references/*` 纯文本内容） |
 
 商店网站与目标系统都用它展示安装前的权限说明。CI 在 Pull Request 摘要中列出与上一个已发布版本相比**新增**的路由、存储范围、外部主机、公开入口、应用内权限、工具（尤其是 `destructive`）与技能，评审时重点检查；目标系统在更新确认中同样高亮新增项。
 

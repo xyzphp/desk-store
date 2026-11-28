@@ -1,0 +1,81 @@
+/* Theme and shared controls follow the device-manager example and workspace-ui. */
+:root {
+  color-scheme: light;
+  --accent: #0a84ff;
+  --bg-win: #f5f5f7;
+  --bg-panel: #fff;
+  --text: #1d1d1f;
+  --text-2: #6e6e73;
+  --border: rgba(0,0,0,.1);
+  --hover: rgba(0,0,0,.05);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-win: #1e1e20;
+  --bg-panel: #2a2a2d;
+  --text: #f5f5f7;
+  --text-2: #a1a1a6;
+  --border: rgba(255,255,255,.1);
+  --hover: rgba(255,255,255,.08);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg-panel); color: var(--text); font: 13px -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif; }
+button,input { font: inherit; }
+[hidden] { display: none !important; }
+.monitor-app { max-width: 1040px; min-height: 100vh; margin: 0 auto; padding: 20px 24px; }
+.monitor-header { min-height: 58px; padding: 0 0 18px; gap: 12px; border-bottom: 0; flex-wrap: nowrap; }
+.device-heading { min-width: 0; margin-right: auto; }
+h1 { margin: 0; font-size: 21px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.device-heading p { margin: 5px 0 0; color: var(--text-2); font-size: 12px; overflow-wrap: anywhere; }
+.connection { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.connection::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #8e8e93; }
+.connection.online::before { background: #30c777; }
+.monitor-card { overflow: hidden; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-panel); }
+.camera { position: relative; aspect-ratio: 16/9; background: #202420; overflow: hidden; }
+.camera img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.camera-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #d0d8cc; font-size: 13px; }
+.camera-caption { position: absolute; inset: auto 0 0; padding: 24px 16px 12px; color: #f5f8ef; background: linear-gradient(transparent,#0007); pointer-events: none; font-size: 12px; }
+.print-status { padding: 20px 22px 24px; }
+.task-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+#task-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.task-state { flex-shrink: 0; padding: 3px 6px; border-radius: 4px; color: var(--text-2); background: var(--hover); font-size: 12px; }
+#progress-value { margin-left: auto; white-space: nowrap; font-size: 20px; font-weight: 500; color: var(--accent); }
+progress { appearance: none; display: block; width: 100%; height: 4px; margin: 14px 0 22px; border: 0; border-radius: 4px; background: var(--hover); accent-color: var(--accent); }
+progress::-webkit-progress-bar { background: var(--hover); border-radius: 4px; }
+progress::-webkit-progress-value { background: var(--accent); border-radius: 4px; }
+progress::-moz-progress-bar { background: var(--accent); border-radius: 4px; }
+.metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); margin: 0; }
+.metrics>div { padding-left: 23px; border-left: 1px solid var(--border); }
+.metrics>div:first-child { padding-left: 0; border-left: 0; }
+.metrics dt { color: var(--text-2); font-size: 12px; }
+.metrics dd { margin: 7px 0 0; font-size: 23px; font-weight: 450; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.metrics dd span { font-size: 12px; color: var(--text-2); }
+.message { margin: 14px 0 0; color: var(--text-2); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.message.error { color: #b26b4e; }
+@media(max-width:600px) {
+  .monitor-app { padding: 16px; }
+  h1 { font-size: 18px; }
+  .monitor-header { gap: 9px; }
+  .metrics { grid-template-columns: 1fr 1fr; gap: 21px 15px; }
+  .metrics>div { padding-left: 0; border: 0; }
+  .metrics>div:nth-child(even) { padding-left: 20px; border-left: 1px solid var(--border); }
+  .print-status { padding: 18px; }
+}
+
+/* The desktop supplies the card frame and title; this view fits its 170px body. */
+body.is-compact { background: transparent; overflow: hidden; }
+.is-compact .monitor-app { min-height: 0; padding: 6px 2px; background: transparent; }
+.is-compact .monitor-header { min-height: 18px; margin-bottom: 8px; padding: 0; }
+.is-compact .device-heading h1 { display: none; }
+.is-compact .device-heading p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-compact .monitor-card { border: 0; border-radius: 0; background: transparent; }
+.is-compact .print-status { padding: 0; }
+.is-compact .task-line { gap: 6px; }
+.is-compact #task-name { min-width: 0; flex: 1; font-size: 12px; }
+.is-compact #progress-value { font-size: 16px; }
+.is-compact progress { margin: 9px 0 12px; }
+.is-compact .metrics { grid-template-columns: 1fr 1fr; gap: 8px; }
+.is-compact .metrics>div { padding: 0; border: 0; }
+.is-compact .metrics>div:nth-child(n+3) { display: none; }
+.is-compact .metrics dd { margin-top: 3px; font-size: 16px; }
+.is-compact .message { margin-top: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.4; }

@@ -48,8 +48,9 @@
 | `files.reference` / `add`、`remove`、`list` | `add`/`remove`: `{ fileId, refKey? }` | 登记、解除或查询应用对已选管理文件的引用；被引用文件禁止回收或删除，应用卸载时自动释放 |
 | `files.save` / `save` | `{ name, file? \| dataBase64?, refKey? }` | 把新文件保存到**调用者本人**的文件管理根目录（需调用者有文件管理权限，≤ 20 MB；规则同文件管理上传：PNG / JPEG 校验并重新编码、配额、默认存储位置），同名时自动改为 `名称 (2).ext`；SDK 接受 `Blob` / `File` 并自动转成 Base64。返回 `{ fileId, name, mediaType, size, width?, height?, refKey? }`；`refKey` 非空且声明了 `files.reference` 时同时登记引用 |
 | `image.sanitize` / `sanitize` | `{ fileId?, dataBase64?, format?, quality?, destPath? }` | 仅接受 PNG / JPEG 并重新编码清洗；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size, sha256 }`，否则返回 `dataBase64` |
-| `ai.complete` / `complete` | `{ system?, messages: [{ role, content }], maxOutput?, responseFormat? }` | 用目标系统的默认文本模型补全文本，返回 `{ text, model, usage: { inputTokens, outputTokens } }`；`role` 只能是 `user` / `assistant` 且最后一条为 `user`，最多 40 条、合计 ≤ 100000 字，`system` ≤ 8000 字，`responseFormat` 为 `text` / `json`；应用拿不到模型地址与密钥，按应用每日计量，超出管理员设定的上限返回 429，上限为 0 时返回 403 |
-| `ai.image` / `generate` | `{ prompt, size?, quality?, destPath? }` | 生成一张 PNG：`prompt` ≤ 4000 字，`size` 为 `auto` 或 `宽x高` 比例（1:3–3:1），`quality` 为 `auto` / `low` / `medium` / `high`；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size }`，否则返回 `dataBase64`；需目标系统已开启生图，计量与限额同上 |
+| `ai.models` / `list` | — | 声明了 `ai.complete` 或 `ai.image` 任一项即可调用，按当前账号权限返回脱敏可用模型 `{ models: [{ id, name, imageEnabled }], defaultModelId, textEnabled, imageEnabled }`（不含供应商地址、密钥或未授权模型） |
+| `ai.complete` / `complete` | `{ modelId?, system?, messages: [{ role, content }], maxOutput?, responseFormat? }` | 用目标系统的指定或默认文本模型补全文本（省略 `modelId` 时按当前账号可用范围优先走默认模型，指定无权模型返回 403），返回 `{ text, model, usage: { inputTokens, outputTokens } }`；`role` 只能是 `user` / `assistant` 且最后一条为 `user`，最多 40 条、合计 ≤ 100000 字，`system` ≤ 8000 字，`responseFormat` 为 `text` / `json`；应用拿不到模型地址与密钥，按应用每日计量，超出管理员设定的上限返回 429，上限为 0 时返回 403 |
+| `ai.image` / `generate` | `{ modelId?, prompt, size?, quality?, destPath? }` | 生成一张 PNG：支持可选 `modelId`（校验当前账号权限与生图规则，缺省优先默认生图模型）；`prompt` ≤ 4000 字，`size` 为 `auto` 或 `宽x高` 比例（1:3–3:1），`quality` 为 `auto` / `low` / `medium` / `high`；传 `destPath` 时写入应用 `/data/...` 存储并返回 `{ path, mediaType, width, height, size }`，否则返回 `dataBase64`；需目标系统已开启生图，计量与限额同上 |
 | `ui` / `toast` | `{ title, message?, type? }` | 系统通知条，`type` 为 `info` / `success` / `error` |
 | `ui` / `alert`、`confirm` | `{ title, message?, okText?, cancelText?, danger? }` | 系统对话框；`confirm` 返回布尔值 |
 | `ui` / `openApp` | `{ id, params? }` | 打开用户能使用的其他应用；`params.openWith` 会被去掉 |
@@ -79,7 +80,7 @@
 | --- | --- |
 | `fields` | ≤ 32 个；为空时系统不显示设置入口 |
 | `key` | `^[a-z][a-z0-9_]{0,31}$`，唯一 |
-| `type` | `text`（单行，`maxLength` 默认 200、最大 2000）、`textarea`（多行，默认与最大 4000）、`number`（`min`、`max`、`integer`）、`boolean`、`select`（`options` 1–50 项，字符串或 `{ value, title }`，值 1–64 个字符且唯一） |
+| `type` | `text`（单行，`maxLength` 默认 200、最大 2000；可选 `options` 作为逗号分隔标签快速选项）、`textarea`（多行，默认与最大 4000）、`number`（`min`、`max`、`integer`）、`boolean`、`select`（`options` 1–50 项，字符串或 `{ value, title }`，值 1–64 个字符且唯一） |
 | `title` / `description` | 标题 ≤ 32 个字符（缺省为 `key`），说明 ≤ 200 个字符，不含控制字符 |
 | `required` | 只用于文本字段 |
 | `default` | 须满足字段规则；缺省时文本为空、数字为 0（按 `min` / `max` 收拢）、开关为 `false`、选择为第一项 |

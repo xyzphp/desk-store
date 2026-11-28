@@ -1,9 +1,10 @@
 import type { OsHost } from '../../host/types';
 import { base64ToBytes, platformAIImage } from '../sdk/bridge';
-import { formatPlatformAIError, loadArticleAISettings } from '../sdk/ai';
+import { formatPlatformAIError, loadArticleAISettings, resolvePlatformModelId } from '../sdk/ai';
 import { aiText } from './locale';
 
 interface ImageRequestPayload {
+  modelId?: string;
   context?: string;
   fields?: Record<string, string>;
   contextFields?: string[];
@@ -36,6 +37,7 @@ export async function generateAIImage(_host: OsHost, body: object, signal: Abort
   try {
     const res = await platformAIImage(
       {
+        modelId: resolvePlatformModelId(req.modelId),
         prompt,
         size: req.size && req.size !== 'auto' ? req.size : undefined,
         quality: req.quality && req.quality !== 'auto' ? req.quality : undefined,

@@ -42,11 +42,19 @@ type BackendSummary struct {
 	Config    []ConfigSummary `json:"config"`
 }
 
+// RouteAuditSummary 是一条后端路由的审计日志声明摘要。
+type RouteAuditSummary struct {
+	Mode   string `json:"mode,omitempty"`
+	Action string `json:"action,omitempty"`
+	Label  string `json:"label,omitempty"`
+}
+
 // RouteSummary 是一条后端路由。
 type RouteSummary struct {
-	Path       string   `json:"path"`
-	Methods    []string `json:"methods"`
-	Visibility string   `json:"visibility"`
+	Path       string             `json:"path"`
+	Methods    []string           `json:"methods"`
+	Visibility string             `json:"visibility"`
+	Audit      *RouteAuditSummary `json:"audit,omitempty"`
 }
 
 // StorageSummary 是启用的存储范围。
@@ -221,7 +229,11 @@ func (m Manifest) summarizeFormatTwo(summary *Summary) {
 	if b := m.Backend; b != nil {
 		backend := &BackendSummary{Routes: []RouteSummary{}, HTTP: []string{}, Hooks: []string{}, Schedules: []string{}, Config: []ConfigSummary{}}
 		for _, route := range b.Routes {
-			backend.Routes = append(backend.Routes, RouteSummary{Path: route.Path, Methods: append([]string{}, route.Methods...), Visibility: route.Visibility})
+			item := RouteSummary{Path: route.Path, Methods: append([]string{}, route.Methods...), Visibility: route.Visibility}
+			if route.Audit != nil {
+				item.Audit = &RouteAuditSummary{Mode: route.Audit.Mode, Action: route.Audit.Action, Label: route.Audit.Label}
+			}
+			backend.Routes = append(backend.Routes, item)
 		}
 		if b.Storage != nil {
 			backend.Storage = StorageSummary{Shared: b.Storage.Shared, Public: b.Storage.Public, Account: b.Storage.Account}

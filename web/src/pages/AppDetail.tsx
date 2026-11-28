@@ -3,7 +3,6 @@ import {
   Button,
   CodeBlock,
   DetailLayout,
-  DetailSection,
   ImageGallery,
   Inline,
   MarkdownView,
@@ -12,14 +11,15 @@ import {
   Property,
   PropertySheet,
   Stack,
+  Tabs,
   Tag,
   Text,
   Timeline,
+  type TabItem,
 } from '@xyzos/desk-ui';
 import {
   appType,
   appTypeLabels,
-  capabilityLabel,
   categoryLabels,
   fetchAdvisories,
   fetchApp,
@@ -28,148 +28,29 @@ import {
   pricingLabels,
   resolveAsset,
   severityLabels,
-  storageLabels,
   storeAddress,
-  visibilityLabel,
   type AppDetail,
-  type PermissionSummary,
 } from '../api';
+import { useStoreToast } from '../components/ToastContext';
 import { href } from '../router';
 import { useData } from '../useData';
+import {
+  ApiIntegrationTab,
+  CapabilitySummaryPanel,
+  hasApiIntegration,
+  hasMcpComponents,
+  hasSkillComponents,
+  McpTab,
+  PermissionsSecurityTab,
+} from './AppDetailSections';
+import { SkillDetailTab } from './SkillDetailView';
 
-function Permissions({ summary }: { summary: PermissionSummary }) {
-  return (
-    <ul className="store-permissions">
-      <li>
-        {summary.entry === 'gateway_page'
-          ? '页面来自经网关代理的上游服务'
-          : summary.entry === 'none'
-            ? '没有窗口界面'
-            : '页面为包内静态文件'}
-      </li>
-      <li>
-        {summary.gatewayApi.length === 0 ? (
-          '不调用系统接口'
-        ) : (
-          <>
-            以当前用户身份调用系统接口：
-            {summary.gatewayApi.map((scope) => (
-              <code key={scope}>{scope}</code>
-            ))}
-          </>
-        )}
-      </li>
-      {summary.proxies.length === 0 && <li>不访问外部服务</li>}
-      {summary.proxies.map((proxy) => (
-        <li key={proxy.key}>
-          访问 <strong>{proxy.title}</strong>：<code>{proxy.upstream}</code>
-          {proxy.baseUrlEditable && '（安装时可修改地址）'}，方法 {proxy.methods.join(' / ')}，路径{' '}
-          {proxy.paths.map((path) => (
-            <code key={path}>{path}</code>
-          ))}
-          {proxy.needsCredential ? `，需要管理员填写凭据（${proxy.authType}）` : '，无需凭据'}
-        </li>
-      ))}
-      {summary.desktopWidget && <li>提供桌面卡片</li>}
-      <FormatTwoPermissions summary={summary} />
-    </ul>
-  );
-}
-
-/** 格式 2 的应用内权限、入口与后端摘要。 */
-function FormatTwoPermissions({ summary }: { summary: PermissionSummary }) {
-  const permissions = summary.access?.permissions ?? [];
-  const backend = summary.backend;
-  const scopes = backend
-    ? (['shared', 'public', 'account'] as const).filter((scope) => backend.storage[scope]).map((scope) => storageLabels[scope])
-    : [];
-  return (
-    <>
-      {permissions.length > 0 && <li>应用内权限：{permissions.map((item) => item.title).join('、')}</li>}
-      {summary.access && summary.access.defaultGrant !== 'none' && <li>安装时建议默认授予所有账号（管理员可以改为不授予）</li>}
-      {summary.surfaces?.standalone && <li>可在浏览器新标签页独立打开</li>}
-      {summary.surfaces?.public && (
-        <li>
-          <strong>提供公开页面（未登录可访问）</strong>
-          {summary.surfaces.public.alias && (
-            <>
-              ，建议路径 <code>{summary.surfaces.public.alias}</code>
-            </>
-          )}
-          {summary.surfaces.public.session === 'optional' && '，已登录时读取登录状态'}
-        </li>
-      )}
-      {backend && (
-        <li>
-          带后端模块，提供 {backend.routes.length} 个接口
-          {backend.routes.map((route) => (
-            <code key={`${route.methods.join('/')} ${route.path}`}>
-              {route.methods.join('/')} {route.path}（{visibilityLabel(route.visibility, permissions)}）
-            </code>
-          ))}
-        </li>
-      )}
-      {scopes.length > 0 && <li>保存{scopes.join('、')}，与系统主库隔离</li>}
-      {backend && backend.http.length > 0 && (
-        <li>
-          后端可访问：
-          {backend.http.map((host) => (
-            <code key={host}>{host}</code>
-          ))}
-        </li>
-      )}
-      {backend && backend.schedules.length > 0 && <li>定时任务：{backend.schedules.join('、')}</li>}
-      {backend && backend.config.length > 0 && (
-        <li>安装时需要填写：{backend.config.map((item) => item.title + (item.secret ? '（加密保存）' : '')).join('、')}</li>
-      )}
-      {summary.platform && summary.platform.uses.length > 0 && <li>平台能力：{summary.platform.uses.join('、')}</li>}
-    </>
-  );
-}
-
-/** AI 工具、提示模板与技能。 */
-function AIComponents({ summary }: { summary: PermissionSummary }) {
-  const tools = summary.mcp?.tools ?? [];
-  const skills = summary.skills ?? [];
-  const kinds = { backend: '后端实现', declarative: '声明式', remote: '远程 MCP' };
-  return (
-    <Stack gap="sm">
-      {tools.map((tool) => (
-        <div key={tool.name} className="store-ai-item">
-          <Inline gap="xs">
-            <strong>{tool.title}</strong>
-            <Text code size="sm">
-              {tool.name}
-            </Text>
-            <Tag tone="muted">{kinds[tool.kind]}</Tag>
-            {tool.readOnly && <Tag tone="success">只读</Tag>}
-            {tool.destructive && <Tag tone="warning">有副作用，调用前确认</Tag>}
-          </Inline>
-          <Text as="p" tone="muted" size="sm">
-            {tool.description}
-          </Text>
-        </div>
-      ))}
-      {(summary.mcp?.prompts.length ?? 0) > 0 && (
-        <Text as="p" tone="muted" size="sm">
-          提示模板：{summary.mcp?.prompts.map((prompt) => prompt.title).join('、')}
-        </Text>
-      )}
-      {skills.map((skill) => (
-        <div key={skill.name} className="store-ai-item">
-          <Inline gap="xs">
-            <strong>技能</strong>
-            <Text code size="sm">
-              {skill.name}
-            </Text>
-          </Inline>
-          <Text as="p" tone="muted" size="sm">
-            {skill.description}
-          </Text>
-        </div>
-      ))}
-    </Stack>
-  );
+function safeHost(value: string): string {
+  try {
+    return new URL(value).host || value;
+  } catch {
+    return value;
+  }
 }
 
 function migrationCount(version: AppDetail['versions'][number]) {
@@ -235,7 +116,7 @@ function Facts({ app }: { app: AppDetail }) {
       {app.homepage && (
         <Property label="主页">
           <a href={app.homepage} target="_blank" rel="noopener noreferrer">
-            {new URL(app.homepage).host}
+            {safeHost(app.homepage)}
           </a>
         </Property>
       )}
@@ -246,12 +127,16 @@ function Facts({ app }: { app: AppDetail }) {
 export function AppDetailPage({ slug }: { slug: string }) {
   const state = useData(() => fetchApp(slug), slug);
   const advisoryState = useData(fetchAdvisories, 'advisories');
+  const { copyText } = useStoreToast();
+
   if (state.status === 'loading') return <p className="store-section store-muted">正在读取应用…</p>;
   if (state.status === 'error') {
     return (
       <section className="store-section store-section--first">
         <h1>没有找到这个应用</h1>
-        <p className="store-muted">读取 {slug} 失败：{state.message}</p>
+        <p className="store-muted">
+          读取 {slug} 失败：{state.message}
+        </p>
         <a href={href({ name: 'apps' })}>返回应用列表</a>
       </section>
     );
@@ -259,16 +144,101 @@ export function AppDetailPage({ slug }: { slug: string }) {
   const app = state.data;
   const latest = app.versions.find((version) => version.version === app.latestVersion) ?? app.versions[0];
   const type = appType(latest?.components);
-  const advisories = advisoryState.status === 'ready' ? advisoryState.data.filter((item) => item.slug === app.slug) : [];
-  const hasAI = Boolean(latest?.permissions.mcp || latest?.permissions.skills?.length);
+  const advisories =
+    advisoryState.status === 'ready' ? advisoryState.data.filter((item) => item.slug === app.slug) : [];
+  const showApiTab = hasApiIntegration(latest?.permissions);
+  const showMcpTab = hasMcpComponents(latest?.permissions);
+  const showSkillsTab = hasSkillComponents(latest?.permissions);
+
+  const tabs: TabItem[] = [
+    {
+      value: 'overview',
+      label: '应用介绍',
+      content: (
+        <Stack gap="md">
+          <Panel>
+            <MarkdownView className="store-markdown" value={app.description || app.summary} />
+          </Panel>
+          {app.screenshots.length > 0 && (
+            <Panel title="截图">
+              <ImageGallery
+                label={`${app.name} 截图`}
+                items={app.screenshots.map((shot, index) => ({
+                  src: resolveAsset(shot),
+                  alt: `${app.name} 截图 ${index + 1}`,
+                }))}
+              />
+            </Panel>
+          )}
+        </Stack>
+      ),
+    },
+  ];
+  if (showApiTab && latest) {
+    tabs.push({
+      value: 'api',
+      label: '接口与集成',
+      content: <ApiIntegrationTab key={`${app.slug}:${latest.version}`} summary={latest.permissions} />,
+    });
+  }
+  if (showMcpTab && latest) {
+    tabs.push({
+      value: 'mcp',
+      label: 'MCP',
+      content: <McpTab slug={app.slug} summary={latest.permissions} />,
+    });
+  }
+  if (showSkillsTab && latest) {
+    tabs.push({
+      value: 'skills',
+      label: '技能',
+      content: (
+        <SkillDetailTab
+          key={`${app.slug}:${latest.version}`}
+          slug={app.slug}
+          skills={latest.permissions.skills ?? []}
+          source={app.source}
+        />
+      ),
+    });
+  }
+  if (latest) {
+    tabs.push({
+      value: 'permissions',
+      label: '权限与安全',
+      content: <PermissionsSecurityTab summary={latest.permissions} />,
+    });
+  }
+  tabs.push({
+    value: 'versions',
+    label: '版本记录',
+    content: (
+      <Panel>
+        <Timeline label="版本记录" items={versionItems(app)} />
+      </Panel>
+    ),
+  });
+
   return (
-    <div className="store-section store-section--first">
-      <a className="store-back" href={href({ name: 'apps' })}>
-        ← 全部应用
-      </a>
+    <div className="store-section store-section--first store-detail-page">
+      <nav className="store-detail-nav" aria-label="面包屑导航">
+        <a href={href({ name: 'home' })}>首页</a>
+        <span className="store-detail-nav-sep" aria-hidden="true">
+          /
+        </span>
+        <a href={href({ name: 'apps' })}>应用</a>
+        <span className="store-detail-nav-sep" aria-hidden="true">
+          /
+        </span>
+        <a href={href({ name: 'apps', category: app.category })}>{categoryLabels[app.category] ?? app.category}</a>
+        <span className="store-detail-nav-sep" aria-hidden="true">
+          /
+        </span>
+        <span className="store-detail-nav-current">{app.name}</span>
+      </nav>
       <DetailLayout
         headingLevel={1}
-        media={<AppIcon image={resolveAsset(app.icon) || undefined} glyph={app.name.slice(0, 1)} size={88} />}
+        media={<AppIcon image={resolveAsset(app.icon) || undefined} glyph={app.name.slice(0, 1)} size={80} />}
         title={app.name}
         description={app.summary}
         meta={
@@ -301,27 +271,23 @@ export function AppDetailPage({ slug }: { slug: string }) {
               <ol className="store-install-steps">
                 <li>在「应用管理 → 应用商店 → 商店源」添加商店地址：</li>
               </ol>
-              <CodeBlock code={storeAddress()} label="商店地址" />
+              <CodeBlock
+                code={storeAddress()}
+                label="商店地址"
+                onCopy={(text) => copyText(text, '商店地址已复制')}
+              />
               <ol className="store-install-steps" start={2}>
                 <li>在「应用商店」中找到「{app.name}」，点击安装。</li>
                 <li>确认权限，按提示填写服务地址与凭据。</li>
                 <li>在账号或角色管理中把应用授权给需要的人。</li>
               </ol>
+              <p className="store-install-guide-link">
+                <a href={href({ name: 'docs', section: 'site', page: 'permissions-and-security' })}>
+                  了解权限与安全说明 →
+                </a>
+              </p>
             </Panel>
-            {latest && (
-              <Panel title="权限与访问">
-                <Permissions summary={latest.permissions} />
-                {latest.permissions.capabilities.length > 0 && (
-                  <Inline gap="xs">
-                    {latest.permissions.capabilities.map((capability) => (
-                      <Tag key={capability} tone="muted">
-                        {capabilityLabel(capability)}
-                      </Tag>
-                    ))}
-                  </Inline>
-                )}
-              </Panel>
-            )}
+            {latest && <CapabilitySummaryPanel version={latest} />}
             <Panel title="信息">
               <Facts app={app} />
             </Panel>
@@ -351,25 +317,7 @@ export function AppDetailPage({ slug }: { slug: string }) {
             </a>
           </Notice>
         )}
-        <DetailSection title="介绍">
-          <MarkdownView className="store-markdown" value={app.description || app.summary} />
-        </DetailSection>
-        {app.screenshots.length > 0 && (
-          <DetailSection title="截图">
-            <ImageGallery
-              label={`${app.name} 截图`}
-              items={app.screenshots.map((shot, index) => ({ src: resolveAsset(shot), alt: `${app.name} 截图 ${index + 1}` }))}
-            />
-          </DetailSection>
-        )}
-        {hasAI && latest && (
-          <DetailSection title="AI 工具与技能">
-            <AIComponents summary={latest.permissions} />
-          </DetailSection>
-        )}
-        <DetailSection title="版本">
-          <Timeline label="版本记录" items={versionItems(app)} />
-        </DetailSection>
+        <Tabs key={app.slug} aria-label="应用详情分区" items={tabs} />
       </DetailLayout>
     </div>
   );

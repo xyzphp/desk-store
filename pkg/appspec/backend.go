@@ -16,6 +16,7 @@ import (
 var (
 	backendNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,31}$`)
 	configKeyPattern   = regexp.MustCompile(`^[a-z][a-z0-9_]{1,31}$`)
+	auditActionPattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,47}$`)
 	rateLimitPattern   = regexp.MustCompile(`^[1-9][0-9]{0,5}/(s|min|h)$`)
 	hostnamePattern    = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 	cronFieldPattern   = regexp.MustCompile(`^[0-9*,/-]+$`)
@@ -50,13 +51,21 @@ type BackendLimits struct {
 	MemoryMB  int `json:"memory_mb,omitempty"`
 }
 
+// BackendRouteAudit 声明该后端路由接入系统操作日志的规则（固定静态文案，不记录动态内容）。
+type BackendRouteAudit struct {
+	Mode   string `json:"mode,omitempty"`
+	Action string `json:"action,omitempty"`
+	Label  string `json:"label,omitempty"`
+}
+
 // BackendRoute 是前端或其他入口可以调用的后端路由。
 type BackendRoute struct {
-	Path       string   `json:"path"`
-	Methods    []string `json:"methods"`
-	Visibility string   `json:"visibility"`
-	RateLimit  string   `json:"rate_limit,omitempty"`
-	TokenScope string   `json:"token_scope,omitempty"`
+	Path       string             `json:"path"`
+	Methods    []string           `json:"methods"`
+	Visibility string             `json:"visibility"`
+	RateLimit  string             `json:"rate_limit,omitempty"`
+	TokenScope string             `json:"token_scope,omitempty"`
+	Audit      *BackendRouteAudit `json:"audit,omitempty"`
 }
 
 // BackendStorage 声明使用的存储范围与配额（MB）。
@@ -249,6 +258,39 @@ func (m *Manifest) validateRoutes() error {
 		if route.RateLimit != "" && !rateLimitPattern.MatchString(route.RateLimit) {
 			return fmt.Errorf("backend.routes 第 %d 项的 rate_limit 格式应为 次数/s|min|h", i+1)
 		}
+		if err := validateRouteAudit(route, i+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateRouteAudit(route *BackendRoute, index int) error {
+	if route.Audit == nil {
+		return nil
+	}
+	mode := route.Audit.Mode
+	if mode != "" && mode != "write" && mode != "all" && mode != "off" {
+		return fmt.Errorf("backend.routes 第 %d 项的 audit.mode 只能是 write、all 或 off", index)
+	}
+	if mode == "off" {
+		if route.Audit.Action != "" || route.Audit.Label != "" {
+			return fmt.Errorf("backend.routes 第 %d 项在 audit.mode 为 off 时不能填写 action 或 label", index)
+		}
+		return nil
+	}
+	if mode == "all" && route.Visibility == "public" {
+		return fmt.Errorf("backend.routes 第 %d 项是 public 路由，不能将 audit.mode 设为 all", index)
+	}
+	if route.Audit.Action != "" && !auditActionPattern.MatchString(route.Audit.Action) {
+		return fmt.Errorf("backend.routes 第 %d 项的 audit.action %q 无效", index, route.Audit.Action)
+	}
+	if route.Audit.Label != "" {
+		trimmed := strings.TrimSpace(route.Audit.Label)
+		if trimmed == "" || len([]rune(trimmed)) > 48 || containsControl(route.Audit.Label) {
+			return fmt.Errorf("backend.routes 第 %d 项的 audit.label 必须是 1-48 个不含控制字符的字符", index)
+		}
+		route.Audit.Label = trimmed
 	}
 	return nil
 }

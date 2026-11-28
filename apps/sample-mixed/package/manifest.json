@@ -40,7 +40,7 @@
     "module": "backend/app.wasm",
     "routes": [
       { "path": "/notes", "methods": ["GET"], "visibility": "app" },
-      { "path": "/notes", "methods": ["POST"], "visibility": "permission:note.write" },
+      { "path": "/notes", "methods": ["POST"], "visibility": "permission:note.write", "audit": { "action": "create_note", "label": "新增笔记" } },
       { "path": "/public/*", "methods": ["GET"], "visibility": "public", "rate_limit": "60/min" },
       { "path": "/tools/*", "methods": ["POST"], "visibility": "permission:note.write" }
     ],

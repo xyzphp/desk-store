@@ -9,6 +9,7 @@ import {
   platformFilesSave,
   platformIdentityMe,
   platformOpenPublicSite,
+  requestInitIfNeeded,
   type InitContext,
 } from '../shared/sdk/bridge';
 import { clearMediaCache, fetchBackendFileBlob } from '../shared/sdk/media';
@@ -80,14 +81,27 @@ export function AppHostProvider({ children }: { children: ReactNode }) {
     };
 
     const offInit = onHostEvent('init', (data) => {
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer);
+        retryTimer = undefined;
+      }
       void applyInit(data);
     });
     const offLock = onHostEvent('lock', () => {
       clearMediaCache();
       setSession((prev) => ({ status: 'locked', generation: prev.generation + 1 }));
     });
+    let retryTimer: number | undefined;
+    if (inHostFrame() && !currentContext()) {
+      requestInitIfNeeded();
+      retryTimer = window.setTimeout(() => {
+        retryTimer = undefined;
+        requestInitIfNeeded();
+      }, 250);
+    }
     return () => {
       active = false;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
       offInit();
       offLock();
       clearMediaCache();

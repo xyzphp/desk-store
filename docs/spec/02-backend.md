@@ -33,7 +33,7 @@
 | 字段 | 规则 |
 | --- | --- |
 | `runtime` / `abi` | 当前只有 `wasm` / `1` |
-| `routes` | ≤ 64 条；`path` 以 `/` 开头，可用末尾 `*` 表示前缀；`methods` 为 `GET HEAD POST PUT PATCH DELETE` 的子集；`visibility` 取值同[应用包格式 2](01-package-v2.md#5-surfaces界面入口与可见范围)；`public` 路由只能读写公开存储，不能调用以用户身份执行的能力 |
+| `routes` | ≤ 64 条；`path` 以 `/` 开头，可用末尾 `*` 表示前缀；`methods` 为 `GET HEAD POST PUT PATCH DELETE` 的子集；`visibility` 取值同[应用包格式 2](01-package-v2.md#5-surfaces界面入口与可见范围)；`public` 路由只能读写公开存储，不能调用以用户身份执行的能力；可选 `audit` 声明系统操作日志规则：`{ mode?: "write" \| "all" \| "off", action?: string, label?: string }`。默认（省略或 `mode: "write"`）对已认证的写方法（`POST / PUT / PATCH / DELETE`）记入系统操作日志；`mode: "all"` 对该路由的全部已认证方法（含 `GET / HEAD`）记日志，禁止用于 `public` 路由；`mode: "off"` 关闭路由自动入账且不能填写 `action` / `label`。`action` 匹配 `^[a-z][a-z0-9_]{1,47}$`，`label` 为 1–48 字符且不含控制字符的固定中文或英文操作名。操作人、来源、状态码与耗时由目标系统填写，日志只记录路由模板与固定操作名，不记录请求/响应正文、查询参数或动态路径 |
 | `storage` | 使用哪些存储范围与配额，见第 4 节 |
 | `http.allow` | ≤ 16 个主机（可带端口）与方法；目标系统发出请求时按自身地址策略校验解析后的地址 |
 | `hooks` | ≤ 8 个公开回调，地址 `{站点根}/custom/<slug>/hooks/<name>`，无会话，签名由模块校验 |

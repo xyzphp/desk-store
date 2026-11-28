@@ -1,6 +1,14 @@
-import { platformSettingsGet } from './bridge';
+import { platformAIModels, platformSettingsGet, type PlatformAIModelOption } from './bridge';
 import type { FormAICapability, FormAIField } from '../ai/formAI';
 import type { ArticleImageCapability } from '../../features/articles/articleImageAI';
+
+export interface ArticleAIModelCatalog {
+  models: PlatformAIModelOption[];
+  defaultModelId: string;
+  textEnabled?: boolean;
+  imageEnabled?: boolean;
+  fallback?: boolean;
+}
 
 export interface ArticleAISettings {
   ai_enabled: boolean;
@@ -73,6 +81,48 @@ export async function loadArticleAISettings(signal?: AbortSignal): Promise<{ set
   return { settings: value, revision };
 }
 
+export async function loadArticleAIModels(signal?: AbortSignal): Promise<ArticleAIModelCatalog> {
+  try {
+    const res = await platformAIModels(signal);
+    const models = Array.isArray(res?.models)
+      ? res.models
+          .filter(
+            (item): item is PlatformAIModelOption =>
+              !!item && typeof item.id === 'string' && item.id.trim() !== '' && typeof item.name === 'string',
+          )
+          .map((item) => ({
+            id: item.id.trim(),
+            name: item.name.trim() || item.id.trim(),
+            imageEnabled: item.imageEnabled === true,
+          }))
+      : [];
+    const defaultId =
+      typeof res?.defaultModelId === 'string' && models.some((m) => m.id === res.defaultModelId)
+        ? res.defaultModelId
+        : (models[0]?.id ?? '');
+    return {
+      models,
+      defaultModelId: defaultId,
+      textEnabled: typeof res?.textEnabled === 'boolean' ? res.textEnabled : undefined,
+      imageEnabled: typeof res?.imageEnabled === 'boolean' ? res.imageEnabled : undefined,
+    };
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err;
+    // 兼容尚未提供 platform.ai.models 的旧版本宿主：回退为单一默认占位项。
+    return {
+      models: [{ id: 'platform-default', name: '系统默认模型', imageEnabled: true }],
+      defaultModelId: 'platform-default',
+      fallback: true,
+    };
+  }
+}
+
+export function resolvePlatformModelId(modelId?: string): string | undefined {
+  const trimmed = typeof modelId === 'string' ? modelId.trim() : '';
+  if (!trimmed || trimmed === 'platform-default') return undefined;
+  return trimmed;
+}
+
 export function renderPromptTemplate(template: string, vars: Readonly<Record<string, string>>): string {
   return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key: string) => vars[key] ?? '');
 }
@@ -96,6 +146,7 @@ export function formatPlatformAIError(error: unknown, fallback: string): Error {
     return new Error('已达到本应用今日 AI 调用限额，请明日再试或联系管理员调整限额');
   }
   if (lower.includes('403') || lower.includes('禁用') || lower.includes('disabled') || lower.includes('forbidden')) {
+    if (msg.includes('无权调用')) return new Error(msg);
     return new Error('管理员已关闭本应用的 AI 能力，请在「应用管理」中开启');
   }
   return new Error(msg || fallback);
@@ -123,14 +174,29 @@ const articleFieldsSpec: FormAIField[] = [
 export function buildArticleCapability(
   settings: ArticleAISettings,
   revision: number,
+  catalog?: ArticleAIModelCatalog,
 ): ArticleImageCapability & FormAICapability {
   const languages = parseTranslateLanguages(settings.ai_translate_languages);
+  const models = (
+    catalog?.models ?? [{ id: 'platform-default', name: '系统默认模型', imageEnabled: settings.ai_image_enabled }]
+  ).map((model) => ({
+    id: model.id,
+    name: model.name,
+    imageEnabled: settings.ai_image_enabled && model.imageEnabled,
+  }));
+  const defaultModelId =
+    catalog?.defaultModelId && models.some((m) => m.id === catalog.defaultModelId)
+      ? catalog.defaultModelId
+      : (models[0]?.id ?? '');
+  const textEnabled = settings.ai_enabled && (catalog?.textEnabled ?? true) && models.length > 0;
+  const imageEnabled =
+    settings.ai_image_enabled && (catalog?.imageEnabled ?? true) && models.some((model) => model.imageEnabled);
   return {
-    enabled: settings.ai_enabled || settings.ai_image_enabled,
+    enabled: textEnabled || imageEnabled,
     promptPreviewEnabled: true,
-    textEnabled: settings.ai_enabled,
-    formEnabled: settings.ai_enabled,
-    imageEnabled: settings.ai_image_enabled,
+    textEnabled,
+    formEnabled: textEnabled,
+    imageEnabled,
     revision,
     actions: [
       { id: 'polish', name: '润色' },
@@ -139,8 +205,8 @@ export function buildArticleCapability(
       { id: 'translate', name: '翻译' },
       { id: 'custom', name: '自定义' },
     ],
-    models: [{ id: 'platform-default', name: '系统默认模型', imageEnabled: settings.ai_image_enabled }],
-    defaultModelId: 'platform-default',
+    models,
+    defaultModelId,
     fields: articleFieldsSpec,
     languages,
     language: languages[0] ?? '简体中文',

@@ -3,8 +3,10 @@ import { platformAIComplete } from '../sdk/bridge';
 import {
   buildArticleCapability,
   formatPlatformAIError,
+  loadArticleAIModels,
   loadArticleAISettings,
   renderPromptTemplate,
+  resolvePlatformModelId,
 } from '../sdk/ai';
 import type { AICapability } from './capability';
 import { createAIRequestId } from './textAI';
@@ -77,8 +79,11 @@ export async function readFormAICapability(
   _identity: FormAIIdentity,
   signal: AbortSignal,
 ): Promise<FormAICapability> {
-  const { settings, revision } = await loadArticleAISettings(signal);
-  return buildArticleCapability(settings, revision);
+  const [{ settings, revision }, models] = await Promise.all([
+    loadArticleAISettings(signal),
+    loadArticleAIModels(signal),
+  ]);
+  return buildArticleCapability(settings, revision, models);
 }
 
 export function createFormAIRequest(host: OsHost, options: FormAIRequestOptions): FormAIRequestBody {
@@ -252,6 +257,7 @@ export async function generateFormAI(
   try {
     const res = await platformAIComplete(
       {
+        modelId: resolvePlatformModelId(req.modelId),
         system:
           '你是文章表单智能补全助手。严格按要求的 JSON 对象返回字段值；不得改动正文中的 article-file:<编号> 媒体引用。',
         messages: [{ role: 'user', content: userPrompt }],

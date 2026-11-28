@@ -38,13 +38,13 @@
     "limits": { "timeout_ms": 5000, "memory_mb": 64 },
     "routes": [
       { "path": "/state", "methods": ["GET"], "visibility": "app" },
-      { "path": "/boards", "methods": ["POST"], "visibility": "permission:board.manage" },
-      { "path": "/boards/*", "methods": ["DELETE"], "visibility": "permission:board.manage" },
-      { "path": "/tasks", "methods": ["POST"], "visibility": "permission:task.write" },
-      { "path": "/tasks/*", "methods": ["PATCH", "DELETE"], "visibility": "permission:task.write" },
-      { "path": "/remind/*", "methods": ["POST"], "visibility": "app", "rate_limit": "20/min" },
-      { "path": "/me/pins/*", "methods": ["POST", "DELETE"], "visibility": "app" },
-      { "path": "/me/filter", "methods": ["PUT"], "visibility": "app" }
+      { "path": "/boards", "methods": ["POST"], "visibility": "permission:board.manage", "audit": { "action": "create_board", "label": "新建看板" } },
+      { "path": "/boards/*", "methods": ["DELETE"], "visibility": "permission:board.manage", "audit": { "action": "delete_board", "label": "删除看板" } },
+      { "path": "/tasks", "methods": ["POST"], "visibility": "permission:task.write", "audit": { "action": "create_task", "label": "新建任务" } },
+      { "path": "/tasks/*", "methods": ["PATCH", "DELETE"], "visibility": "permission:task.write", "audit": { "action": "mutate_task", "label": "修改或删除任务" } },
+      { "path": "/remind/*", "methods": ["POST"], "visibility": "app", "rate_limit": "20/min", "audit": { "action": "send_reminder", "label": "发送任务提醒" } },
+      { "path": "/me/pins/*", "methods": ["POST", "DELETE"], "visibility": "app", "audit": { "action": "toggle_pin", "label": "更新个人置顶" } },
+      { "path": "/me/filter", "methods": ["PUT"], "visibility": "app", "audit": { "mode": "off" } }
     ],
     "storage": {
       "shared": true,

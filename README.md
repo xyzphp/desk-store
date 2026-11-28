@@ -29,7 +29,7 @@ An open-source app store for browser desktops. Apps are submitted as source code
 | `internal/build/` | 从 `apps/` 生成商店静态数据 |
 | `web/` | 商店网站（React + [`@xyzos/desk-ui`](https://github.com/xyzphp/desk-ui)） |
 | `desk-ui/` | 组件库 desk-ui 的 git 子模块，网站直接使用其源码 |
-| `docs/` | 站点文档、应用开发文档与自建文档，网站构建时一并发布 |
+| `docs/` | 使用商店、应用开发、平台能力与自建商店文档，网站构建时一并发布 |
 
 ## 开发应用
 

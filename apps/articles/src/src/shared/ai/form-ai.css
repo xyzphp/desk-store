@@ -33,7 +33,7 @@
   .desk-form-ai-picker {
     z-index: 9660;
     width: 320px;
-    padding: 12px;
+    padding: 6px;
     overflow: auto;
     overscroll-behavior: contain;
     border-radius: var(--radius);
@@ -41,14 +41,15 @@
   }
   .desk-form-ai-picker .ai-assist-picker-section {
     display: grid;
-    gap: 6px;
+    gap: 2px;
     min-width: 0;
     padding: 0;
     margin: 0;
     border: 0;
   }
   .desk-form-ai-picker .ai-assist-picker-section legend {
-    margin-bottom: 8px;
+    padding: 6px 10px 4px;
+    margin: 0;
     color: var(--text-2);
     font-size: 12px;
   }
@@ -56,7 +57,26 @@
     justify-content: flex-start;
     width: 100%;
     min-width: 0;
+    min-height: 34px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: calc(5px * var(--ds-radius-scale));
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 400;
     text-align: left;
+  }
+  .desk-form-ai-picker .ai-assist-picker-option:where(:hover, :focus-visible):not(:disabled) {
+    border: 0;
+    background: var(--hover);
+    color: var(--text);
+  }
+  .desk-form-ai-picker .ai-assist-picker-option[aria-pressed='true'] {
+    border: 0;
+    background: var(--ds-selection-bg);
+    color: var(--accent);
+    font-weight: 500;
   }
   .desk-form-ai-picker .ai-assist-picker-option > span:first-child {
     min-width: 0;
@@ -74,14 +94,17 @@
   }
   .desk-form-ai-picker .ai-assist-size-options {
     display: grid;
-    gap: 4px;
+    gap: 2px;
   }
   .desk-form-ai-picker .ai-assist-quality {
     display: grid;
     gap: 6px;
-    margin-top: 12px;
-    padding-top: 12px;
+    margin-top: 8px;
+    padding: 10px 8px 6px;
     border-top: 1px solid var(--border);
+  }
+  .desk-form-ai-picker .ai-assist-quality legend {
+    padding: 0 2px 4px;
   }
   .desk-form-ai-picker .ai-assist-quality output {
     color: var(--accent);

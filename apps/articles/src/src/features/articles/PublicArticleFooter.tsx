@@ -9,27 +9,37 @@ import {
 import { readerIcon } from './publicArticleIcons';
 import { articleMessages } from './locale';
 import { groupArticleFooterItems, readArticleFooterItems } from './footerItems';
+import { articleFooterBackgroundFallback, articleFooterTextFallback } from './siteStyleDefaults';
 
 const labelColors = ['primary', 'success', 'info', 'warning', 'danger', 'mint', 'purple', 'pink', 'dark'];
 
-function PublicArticleFooter({ site, backendBase }: { site: PublicArticleSiteConfig; backendBase: string }) {
+function PublicArticleFooter({
+  site,
+  base,
+  backendBase,
+}: {
+  site: PublicArticleSiteConfig;
+  base: string;
+  backendBase: string;
+}) {
   const t = useMessages(articleMessages);
   const footer = site.footer;
   if (footer.enabled === false) return null;
   const columns = Array.isArray(footer.columns)
     ? footer.columns.filter((item): item is Record<string, unknown> => isPublicRecord(item) && item.enabled !== false)
     : [];
-  const bgMode = cleanPublicText(footer.bgMode, 'repeat');
+  const bgMode = cleanPublicText(footer.bgMode, 'repeat') || 'repeat';
   const imageID = safePublicImageID(footer.bgImage) ? Number(footer.bgImage) : 0;
   const bgImageURL =
     typeof footer.bgImageUrl === 'string' && /^https?:\/\//i.test(footer.bgImageUrl) ? footer.bgImageUrl : '';
+  const defaultBgUrl = `${base.replace(/\/+$/, '')}/theme/footer_bg_01.png`;
   const image =
     bgMode === 'none'
       ? 'none'
-      : `url("${imageID ? `${backendBase}/public/site/files/${imageID}` : bgImageURL || 'theme/footer_bg_01.png'}")`;
+      : `url("${imageID ? `${backendBase}/public/site/files/${imageID}` : bgImageURL || defaultBgUrl}")`;
   const style = {
-    '--footer-bg': cleanPublicText(footer.bgColor, 'var(--bg-panel)'),
-    '--footer-color': cleanPublicText(footer.textColor, 'var(--text)'),
+    '--footer-bg': cleanPublicText(footer.bgColor).trim() || articleFooterBackgroundFallback,
+    '--footer-color': cleanPublicText(footer.textColor).trim() || articleFooterTextFallback,
     '--footer-bg-image': image,
     '--footer-bg-repeat': bgMode === 'repeat' ? 'repeat' : 'no-repeat',
     '--footer-bg-size': bgMode === 'cover' ? 'cover' : bgMode === 'contain' ? 'contain' : 'auto',

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3d打印监控</title>
+  <link rel="stylesheet" href="./shared/workspace-ui.css">
+  <link rel="stylesheet" href="./app.css">
+  <script src="./shared/desktop-sdk.js" defer></script>
+  <script src="./bridge.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <main class="workspace-app monitor-app">
+    <header class="workspace-toolbar monitor-header">
+      <div class="device-heading"><h1 id="device-name">3d打印监控</h1><p id="device-address">正在读取设备…</p></div>
+      <span class="connection" id="connection">未连接</span>
+    </header>
+
+    <section class="monitor-card" aria-label="打印机状态">
+      <div class="camera" id="camera" hidden>
+        <img id="camera-image" alt="打印机摄像头" hidden>
+        <div class="camera-empty" id="camera-empty">正在读取摄像头…</div>
+        <div class="camera-caption"><span id="camera-label">摄像头</span></div>
+      </div>
+      <div class="print-status">
+        <div class="task-line"><span id="task-name">等待设备状态</span><span class="task-state" id="task-state">未连接</span><strong id="progress-value">—</strong></div>
+        <progress id="progress" value="0" max="100" aria-label="打印进度"></progress>
+        <dl class="metrics"><div><dt>剩余时间</dt><dd id="remaining-value">—</dd></div><div><dt>打印层数</dt><dd id="layer-value">—</dd></div><div><dt>喷嘴温度</dt><dd id="nozzle-value">—</dd></div><div><dt>热床温度</dt><dd id="bed-value">—</dd></div></dl>
+      </div>
+    </section>
+    <p class="message" id="status-message" role="status">正在连接监控服务…</p>
+  </main>
+</body>
+</html>

@@ -4,22 +4,44 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // 格式 2 的技能组件，合同见 docs/spec/01-package-v2.md 第 9 节。
 
 var skillNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]{1,47}$`)
 
-// SkillInfo 是从 SKILL.md 头部读取的技能信息。
+// SkillFile 是技能目录内的文件（SKILL.md 与 references/*），用于在商店与系统中展示技能文档与参考资料。
+type SkillFile struct {
+	Path    string `json:"path"`
+	Size    int    `json:"size"`
+	Content string `json:"content,omitempty"`
+}
+
+// SkillInfo 是从 SKILL.md 头部与技能目录读取的技能信息。
 type SkillInfo struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Tools       []string `json:"tools,omitempty"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Tools       []string    `json:"tools,omitempty"`
+	Files       []SkillFile `json:"files,omitempty"`
 }
 
 // SkillInfos 返回校验后的技能信息（按清单顺序）。
-func (m Manifest) SkillInfos() []SkillInfo { return append([]SkillInfo{}, m.skillInfo...) }
+func (m Manifest) SkillInfos() []SkillInfo {
+	out := make([]SkillInfo, len(m.skillInfo))
+	for i, info := range m.skillInfo {
+		if len(info.Tools) > 0 {
+			info.Tools = append([]string{}, info.Tools...)
+		}
+		if len(info.Files) > 0 {
+			info.Files = append([]SkillFile{}, info.Files...)
+		}
+		out[i] = info
+	}
+	return out
+}
 
 func (m *Manifest) validateSkills(files []File) error {
 	declared := map[string]bool{}
@@ -63,6 +85,7 @@ func (m *Manifest) validateSkills(files []File) error {
 		m.skillInfo = append(m.skillInfo, info)
 	}
 	references := 0
+	skillFiles := map[string][]SkillFile{}
 	for _, file := range files {
 		rest, ok := strings.CutPrefix(file.Path, "skills/")
 		if !ok {
@@ -72,16 +95,33 @@ func (m *Manifest) validateSkills(files []File) error {
 		if !declared[dir] {
 			return fmt.Errorf("%q 不属于任何已声明的技能", file.Path)
 		}
-		if inner == "SKILL.md" {
-			continue
+		if inner != "SKILL.md" {
+			if !strings.HasPrefix(inner, "references/") {
+				return fmt.Errorf("技能目录中只允许 SKILL.md 与 references/，%q 不允许", file.Path)
+			}
+			references += len(file.Content)
 		}
-		if !strings.HasPrefix(inner, "references/") {
-			return fmt.Errorf("技能目录中只允许 SKILL.md 与 references/，%q 不允许", file.Path)
+		entry := SkillFile{Path: inner, Size: len(file.Content)}
+		if utf8.Valid(file.Content) {
+			entry.Content = string(file.Content)
 		}
-		references += len(file.Content)
+		skillFiles[dir] = append(skillFiles[dir], entry)
 	}
 	if references > 512<<10 {
 		return errors.New("技能参考文件合计超过 512 KB")
+	}
+	for i := range m.skillInfo {
+		list := skillFiles[m.skillInfo[i].Name]
+		sort.Slice(list, func(a, b int) bool {
+			if list[a].Path == "SKILL.md" {
+				return true
+			}
+			if list[b].Path == "SKILL.md" {
+				return false
+			}
+			return list[a].Path < list[b].Path
+		})
+		m.skillInfo[i].Files = list
 	}
 	return nil
 }

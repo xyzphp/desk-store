@@ -418,7 +418,7 @@ export default function PublicArticleSite({
         onBarrage={openBarrage}
       />
     ) : null;
-  const footer = <PublicArticleFooter site={site} backendBase={backendBase} />;
+  const footer = <PublicArticleFooter site={site} base={base} backendBase={backendBase} />;
 
   return (
     <div className="article-blog">

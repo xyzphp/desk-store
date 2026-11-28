@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Icon, useMessages } from '@xyzos/desk-ui';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AnchorPopover, Icon, useMessages } from '@xyzos/desk-ui';
 import { MarkdownVisualEditor, type MarkdownVisualEditorHandle } from '../../shared/markdown/MarkdownVisualEditor';
 import { TextAIEditor } from '../../shared/ai/TextAIEditor';
 import { FilePickerDialog } from '../../shared/files/FilePickerDialog';
@@ -192,6 +192,9 @@ export function ArticleEditor({ state }: { state: ArticleState }) {
   const [historyButtons, setHistoryButtons] = useState({ canUndo: false, canRedo: false });
   const [filesOpen, setFilesOpen] = useState(false);
   const [coverPickerOpen, setCoverPickerOpen] = useState(false);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const visibilityTrigger = useRef<HTMLButtonElement>(null);
+  const visibilityMenuId = useId();
   const draft = state.draft;
   const hasDraft = !!draft;
   const trashed = !!state.record?.trashedAt;
@@ -200,6 +203,7 @@ export function ArticleEditor({ state }: { state: ArticleState }) {
   useEffect(() => {
     setFilesOpen(false);
     setCoverPickerOpen(false);
+    setVisibilityOpen(false);
   }, [state.record?.id, hasDraft]);
   const mode = state.editorMode;
   const editorContent = draft?.content;
@@ -623,16 +627,17 @@ export function ArticleEditor({ state }: { state: ArticleState }) {
               disabled={state.busy || trashed}
               onChange={(categoryId) => state.setDraft({ categoryId })}
             />
-            <div className="ar-dropdown-wrap" data-ar-dropdown-wrap="visibility">
+            <div className={`ar-dropdown-wrap${visibilityOpen ? ' is-open' : ''}`} data-ar-dropdown-wrap="visibility">
               <button
+                ref={visibilityTrigger}
                 type="button"
                 className="ar-meta-pill ar-dropdown-btn"
                 data-ar-dropdown-trigger="visibility"
+                aria-haspopup="listbox"
+                aria-expanded={visibilityOpen}
+                aria-controls={visibilityOpen ? visibilityMenuId : undefined}
                 disabled={state.busy || trashed}
-                onClick={(event) => {
-                  const menu = event.currentTarget.nextElementSibling as HTMLElement | null;
-                  if (menu) menu.hidden = !menu.hidden;
-                }}
+                onClick={() => setVisibilityOpen((open) => !open)}
               >
                 <Icon className="xyz-icon lucide" name={draft.visibility === 'public' ? 'globe' : 'lock'} />
                 <span className="ar-dropdown-label">
@@ -642,26 +647,38 @@ export function ArticleEditor({ state }: { state: ArticleState }) {
                   <Icon className="xyz-icon lucide" name="chevron-down" />
                 </span>
               </button>
-              <div className="ar-dropdown-menu" data-ar-dropdown-menu="visibility" role="listbox" hidden>
+              <AnchorPopover
+                id={visibilityMenuId}
+                open={visibilityOpen && !state.busy && !trashed}
+                anchor={visibilityTrigger}
+                className="ds-choice-menu"
+                role="listbox"
+                placement="bottom-start"
+                gap={4}
+                data-ar-dropdown-menu="visibility"
+                onClose={() => setVisibilityOpen(false)}
+              >
                 {(['private', 'public'] as const).map((visibility) => (
                   <button
                     key={visibility}
                     type="button"
-                    className={`ar-dropdown-item${draft.visibility === visibility ? ' is-active' : ''}`}
+                    className="ds-choice-option"
                     role="option"
                     aria-selected={draft.visibility === visibility}
                     data-ar-set-visibility={visibility}
                     onClick={() => {
                       state.setDraft({ visibility });
-                      const menu = document.current?.querySelector<HTMLElement>('[data-ar-dropdown-menu="visibility"]');
-                      if (menu) menu.hidden = true;
+                      setVisibilityOpen(false);
                     }}
                   >
-                    <Icon className="xyz-icon lucide" name={visibility === 'public' ? 'globe' : 'lock'} />
-                    {visibility === 'public' ? t.common.visibility.public : t.common.visibility.private}
+                    <span className="ar-visibility-option-label">
+                      <Icon className="xyz-icon lucide" name={visibility === 'public' ? 'globe' : 'lock'} />
+                      {visibility === 'public' ? t.common.visibility.public : t.common.visibility.private}
+                    </span>
+                    <Icon name="check" />
                   </button>
                 ))}
-              </div>
+              </AnchorPopover>
             </div>
             <Cover state={state} disabled={state.busy || trashed} onOpen={() => setCoverPickerOpen(true)} />
             <ArticleTagEditor

@@ -3,8 +3,10 @@ import { platformAIComplete } from '../sdk/bridge';
 import {
   buildArticleCapability,
   formatPlatformAIError,
+  loadArticleAIModels,
   loadArticleAISettings,
   renderPromptTemplate,
+  resolvePlatformModelId,
 } from '../sdk/ai';
 import type { AICapability } from './capability';
 import type { FormAIIdentity } from './formAI';
@@ -77,8 +79,11 @@ export async function readTextAICapability(
   signal: AbortSignal,
   _targetOptions: TextAITargetOptions = {},
 ): Promise<AICapability> {
-  const { settings, revision } = await loadArticleAISettings(signal);
-  return buildArticleCapability(settings, revision);
+  const [{ settings, revision }, models] = await Promise.all([
+    loadArticleAISettings(signal),
+    loadArticleAIModels(signal),
+  ]);
+  return buildArticleCapability(settings, revision, models);
 }
 
 export function createTextAIRequest(
@@ -173,6 +178,7 @@ export async function generateTextAI(
   try {
     const res = await platformAIComplete(
       {
+        modelId: resolvePlatformModelId(req.modelId),
         system: prompt.system,
         messages: [{ role: 'user', content: prompt.user }],
         maxOutput: 4096,

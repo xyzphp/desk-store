@@ -1,30 +1,29 @@
 # 沙箱与桥接
 
-## 沙箱限制
+应用页面运行在不透明源浏览器沙箱中，与外部服务、应用后端和平台能力通信均通过受控消息桥接完成；格式 2 应用还可直接复用系统托管的组件库。
 
-应用页面运行在 `sandbox="allow-scripts"` 的 iframe 中，文档是不透明源：
+## 1. 沙箱运行约束
 
-- 没有登录会话 Cookie，不能发起同源请求；
-- `localStorage`、`sessionStorage`、IndexedDB 不可用；
-- 不能访问桌面页面的 DOM，也不能访问其他应用；
-- 锁屏时窗口会被关闭。
+页面运行在 `sandbox="allow-scripts"` 的 iframe 中：
 
-需要与外部交互时，页面通过 `window.parent.postMessage` 把请求交给桌面壳，壳校验后代为请求。消息的目标源取页面基址的源：
+- 拿不到登录会话 Cookie，不能直接发起同源或跨域网络请求；
+- `localStorage`、`sessionStorage` 与 IndexedDB 不可用（状态持久化请使用 `workspace.state` 或后端存储）；
+- 无法访问桌面壳 DOM 或其他应用窗口；锁屏时窗口自动销毁。
 
-```js
-const origin = new URL(document.baseURI).origin;
-```
+所有 `postMessage` 通信的目标源均取 `new URL(document.baseURI).origin`，接收回复时严格校验 `event.source === window.parent && event.origin === hostOrigin`。同一窗口最多允许 8 个并发请求，重复 `id` 会被忽略。
 
-每个请求带一个页面内唯一的 `id`（不超过 128 个字符的字符串，或安全整数），回复消息带同一个 `id`。同一窗口最多 8 个请求同时进行，单个请求 60 秒超时。
+## 2. 格式 1 桥接协议
 
-## 调用受控代理
+### 受控代理（`xyzos:proxy`）
 
 ```js
+const hostOrigin = new URL(document.baseURI).origin;
 const pending = new Map();
 
 window.addEventListener('message', (event) => {
+  if (event.source !== window.parent || event.origin !== hostOrigin) return;
   const data = event.data || {};
-  if (event.source !== window.parent || data.type !== 'xyzos:proxy:response') return;
+  if (data.type !== 'xyzos:proxy:response') return;
   const resolve = pending.get(data.id);
   if (resolve) {
     pending.delete(data.id);
@@ -32,71 +31,88 @@ window.addEventListener('message', (event) => {
   }
 });
 
-function proxy(name, path, options = {}) {
+function callProxy(name, path, options = {}) {
   return new Promise((resolve) => {
-    const id = 'req-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+    const id = `req-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     pending.set(id, resolve);
-    window.parent.postMessage({
-      type: 'xyzos:proxy',
-      id,
-      proxy: name,                 // 对应 proxies[].key
-      path,                        // 必须在 paths 白名单内
-      method: options.method || 'GET',
-      query: options.query || '',  // 需要 pass_query: true
-      body: options.body || '',
-      contentType: options.contentType || '',
-    }, new URL(document.baseURI).origin);
+    window.parent.postMessage(
+      {
+        type: 'xyzos:proxy',
+        id,
+        proxy: name,
+        path,
+        method: options.method || 'GET',
+        query: options.query || '',
+        body: options.body || '',
+        contentType: options.contentType || '',
+      },
+      hostOrigin,
+    );
   });
 }
-
-const result = await proxy('weather', '/now', { query: 'city=shanghai' });
-// result: { type, id, ok, status, contentType, body, error? }
+// 返回：{ type, id, ok, status, contentType, body, error? }
 ```
 
-`body` 是上游响应的文本。失败时 `ok` 为 `false`，`error` 给出原因；上游的 HTTP 错误通过 `status` 体现。请求体与路径都有大小限制，超出会直接返回错误。
+### 系统接口（`xyzos:api`）
 
-## 调用系统接口
-
-在清单中声明 `gateway_api` 前缀后，应用可以以**当前用户身份**调用这些前缀下的系统接口：
-
-```json
-{ "gateway_api": ["/xyzos/api/bookmarks/"] }
-```
+声明 `gateway_api` 前缀后，可以当前用户身份访问白名单内的系统接口：
 
 ```js
-window.parent.postMessage({
-  type: 'xyzos:api',
-  id: 'bookmarks-1',
-  path: '/xyzos/api/bookmarks',
-  method: 'GET',
-}, new URL(document.baseURI).origin);
+window.parent.postMessage(
+  { type: 'xyzos:api', id: 'api-1', path: '/xyzos/api/example', method: 'GET' },
+  new URL(document.baseURI).origin,
+);
 // 回复：{ type: 'xyzos:api:response', id, ok, status, contentType, body, encoding }
 ```
 
-- 清单声明不会创建接口，只是允许访问；用户没有对应权限时只会得到 401 / 403。
-- 会话、账户与凭据管理等敏感接口始终拒绝。
-- 非文本响应以 base64 返回（`encoding` 为 `base64`），请求体上限 256 KB，响应上限 4 MB。
-- 前缀会规整为尾斜杠形式；`/xyzos/api/bookmarks/` 允许访问 `/xyzos/api/bookmarks` 本身，但不匹配 `/xyzos/api/bookmarks-extra`。
+用户无权访问时返回 `401` / `403`；会话、账号、角色、令牌与凭据类端点永久拒绝。请求体上限 256 KB，响应上限 4 MB（二进制以 `encoding: "base64"` 返回）。
 
-**能调用系统接口的应用可以读取用户的数据**，评审时会重点检查这一项。只声明确实需要的前缀。
+### 上游页面（`gateway_page`）
 
-## 上游页面
+声明 `gateway_page` 时，目标系统经对应只读代理加载上游网页并自动改写同源相对路径，外部来源资源不会被加载。
 
-已有网页服务时，可以不在包里放 HTML，而是让系统代理加载上游页面：
+## 3. 格式 2 消息协议（`__xyzos: 1`）
 
-```json
-{
-  "gateway_page": { "proxy": "portal", "path": "/portal/" },
-  "permissions": ["proxy.portal"],
-  "proxies": [{
-    "key": "portal", "title": "门户", "upstream": "https://portal.example.com",
-    "base_url_editable": true, "auth_type": "none", "paths": ["/portal/"], "methods": ["GET"]
-  }]
-}
+| 方向 | 结构 | 说明 |
+| --- | --- | --- |
+| 页面 → 壳 | `{ __xyzos: 1, id, method, args }` | `id` 为 ≤ 128 字符字符串或安全整数 |
+| 壳 → 页面（回复） | `{ __xyzos: 1, id, result }` 或 `{ __xyzos: 1, id, error }` | 失败时 `error` 为可读文本 |
+| 壳 → 页面（事件） | `{ __xyzos: 1, event, data }` | 宿主下发的状态与生命周期事件 |
+
+### 宿主事件
+
+| 事件 | 说明 |
+| --- | --- |
+| `init` | 页面加载完成时触发：`{ windowId, appId, params, theme, workspaceState, permissions, locale }` |
+| `theme` | 主题变化 `{ mode, theme, accent, wallpaper }`，页面写入 `<html data-theme>` 与 `--accent` |
+| `locale` | 语言标签变化（BCP 47），传给组件库 `ConfigProvider` |
+| `app:params:{appId}` | 窗口已打开时通过「用…打开」或深链再次触发时下发新 `params` |
+
+### 桥接方法
+
+- **`backend`**：调用 `backend.routes` 声明的 Wasm 后端接口，`args: { path, method?, headers?, body?, bodyEncoding? }`，返回 `{ ok, status, headers, body, encoding }`；
+- **`backendUpload`**：直传 `File` / `Blob`（上限 50 MB）到后端 `POST` 路由，`args: { path, file, filename?, scope?, headers? }`；
+- **`platform`**：调用已声明的平台能力 `{ capability, action, payload }`，完整清单见 [能力总览](../platform/01-capabilities.md)；
+- **`activity` / `closeWindow`**：刷新闲置锁屏计时（每秒最多一次）/ 请求关闭当前窗口。
+
+## 4. 托管组件库（`@xyzos/desk-ui`）
+
+格式 2 页面可在 `<head>` 声明托管组件库元标签，由目标系统注入与宿主一致的 React 与 `@xyzos/desk-ui` 导入映射和样式表，无需打进安装包：
+
+```html
+<meta name="xyzos-desk-ui" content="1">
 ```
 
-页面与它的资源都经同一代理加载，受路径白名单约束；页面中的同源绝对路径会被改写到代理地址，外部来源的资源不会加载。代理必须允许 `GET`，页面路径必须在白名单内。
+使用构建工具时，将以下 5 个模块设为外部依赖：
 
-## 主题
+```ts
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      external: ['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime', '@xyzos/desk-ui'],
+    },
+  },
+});
+```
 
-桌面卡片中的 iframe 会收到 `{ type: 'xyzos:widget:theme', theme, compact }` 消息，可以据此切换深浅色和紧凑布局。
+页面根据 `init` 与 `theme` / `locale` 事件同步 `<html data-theme>`、`--accent` 与 `ConfigProvider`，即可与宿主深浅色与语言保持完全一致。

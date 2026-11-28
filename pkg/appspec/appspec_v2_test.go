@@ -68,6 +68,8 @@ func TestFormatTwoAcceptsMixedApp(t *testing.T) {
 	}
 	if skills := manifest.SkillInfos(); len(skills) != 1 || skills[0].Description != "记笔记的写法" || skills[0].Tools[0] != "add_note" {
 		t.Fatalf("skills: %+v", skills)
+	} else if len(skills[0].Files) != 2 || skills[0].Files[0].Path != "SKILL.md" || skills[0].Files[1].Path != "references/style.md" || skills[0].Files[1].Content != "# 风格" {
+		t.Fatalf("skill files: %+v", skills[0].Files)
 	}
 	if scopes := manifest.Backend.StorageScopes(); strings.Join(scopes, ",") != "shared,public" {
 		t.Fatalf("storage scopes: %v", scopes)
@@ -315,5 +317,76 @@ func TestAdvisories(t *testing.T) {
 	}
 	if VerifyAdvisories(keys, append(data, ' '), signature) == nil {
 		t.Fatal("a modified advisories file must fail verification")
+	}
+}
+
+func TestFormatTwoRouteAudit(t *testing.T) {
+	raw := strings.Replace(
+		mixedManifest,
+		`{"path": "/notes", "methods": ["GET", "POST"], "visibility": "app", "token_scope": "notes"}`,
+		`{"path": "/notes", "methods": ["GET", "POST"], "visibility": "app", "token_scope": "notes", "audit": {"mode": "all", "action": "manage_notes", "label": "  操作笔记  "}}`,
+		1,
+	)
+	raw = strings.Replace(
+		raw,
+		`{"path": "/jobs/digest", "methods": ["POST"], "visibility": "app"}`,
+		`{"path": "/jobs/digest", "methods": ["POST"], "visibility": "app", "audit": {"mode": "off"}}`,
+		1,
+	)
+	manifest, err := ParseManifest([]byte(raw), mixedFiles())
+	if err != nil {
+		t.Fatalf("ParseManifest() with valid route audit failed: %v", err)
+	}
+	summary := manifest.Summarize()
+	if summary.Backend == nil || len(summary.Backend.Routes) < 5 {
+		t.Fatalf("unexpected backend summary: %+v", summary.Backend)
+	}
+	gotNotes := summary.Backend.Routes[0].Audit
+	if gotNotes == nil || gotNotes.Mode != "all" || gotNotes.Action != "manage_notes" || gotNotes.Label != "操作笔记" {
+		t.Fatalf("notes route audit summary = %+v", gotNotes)
+	}
+	gotJob := summary.Backend.Routes[4].Audit
+	if gotJob == nil || gotJob.Mode != "off" || gotJob.Action != "" || gotJob.Label != "" {
+		t.Fatalf("job route audit summary = %+v", gotJob)
+	}
+
+	invalidCases := map[string][2]string{
+		"unknown audit mode": {
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app"}`,
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app", "audit": {"mode": "debug"}}`,
+		},
+		"off with label": {
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app"}`,
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app", "audit": {"mode": "off", "label": "不应存在"}}`,
+		},
+		"off with action": {
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app"}`,
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app", "audit": {"mode": "off", "action": "tool_run"}}`,
+		},
+		"all on public route": {
+			`{"path": "/public/*", "methods": ["GET"], "visibility": "public", "rate_limit": "60/min"}`,
+			`{"path": "/public/*", "methods": ["GET"], "visibility": "public", "rate_limit": "60/min", "audit": {"mode": "all"}}`,
+		},
+		"invalid audit action": {
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app"}`,
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app", "audit": {"action": "Bad-Action"}}`,
+		},
+		"control char in audit label": {
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app"}`,
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app", "audit": {"label": "含换行\n标签"}}`,
+		},
+		"too long audit label": {
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app"}`,
+			`{"path": "/tools/*", "methods": ["POST"], "visibility": "app", "audit": {"label": "` + strings.Repeat("字", 49) + `"}}`,
+		},
+	}
+	for name, change := range invalidCases {
+		bad := strings.Replace(mixedManifest, change[0], change[1], 1)
+		if bad == mixedManifest {
+			t.Fatalf("%s: replacement did not apply", name)
+		}
+		if _, err := ParseManifest([]byte(bad), mixedFiles()); err == nil {
+			t.Errorf("%s: expected error", name)
+		}
 	}
 }
